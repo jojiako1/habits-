@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Habit tracker</title>
+<meta name="description" content="Daily habits for mind, body and spirit">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f2f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1210" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Habits">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: summary tiles first, then the chosen day's habits and to-dos beside that week's goals, then one calendar month as a grid, then backup */
+  --bg: #f2f5f3;
+  --surface: #ffffff;
+  --ink: #15201a;
+  --muted: #59675f;
+  --line: #d9e1dc;
+  --accent: #1d6b48;
+  --accent-soft: #e2f0e8;
+  --mind: #3c53c4;
+  --body: #c44d22;
+  --spirit: #9a7106;
+  --warn: #b83227;
+  --warn-soft: #fbe8e5;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1210;
+    --surface: #161e1a;
+    --ink: #e6ede9;
+    --muted: #98a69e;
+    --line: #28332d;
+    --accent: #52c08c;
+    --accent-soft: #1b3127;
+    --mind: #8e9dff;
+    --body: #ff8d5f;
+    --spirit: #e2b440;
+    --warn: #ff7366;
+    --warn-soft: #3a1c19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1210;
+  --surface: #161e1a;
+  --ink: #e6ede9;
+  --muted: #98a69e;
+  --line: #28332d;
+  --accent: #52c08c;
+  --accent-soft: #1b3127;
+  --mind: #8e9dff;
+  --body: #ff8d5f;
+  --spirit: #e2b440;
+  --warn: #ff7366;
+  --warn-soft: #3a1c19;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 20px;
+}
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  margin: 0;
+}
+h1 { font-size: 2.4rem; line-height: 1.05; text-transform: uppercase; }
+h2 { font-size: 1.5rem; line-height: 1.1; }
+h3 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.intro { display: grid; gap: 6px; }
+.intro p, .panel p.note { margin: 0; color: var(--muted); max-width: 62ch; }
+.rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 2px;
+}
+.tile .label { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.tile .big {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tile .sub { font-size: 0.85rem; color: var(--muted); }
+.bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+.panels { display: grid; gap: 20px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 780px) { .panels { grid-template-columns: 1.3fr 1fr; } }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.daynav, .mnav { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; }
+.daynav .mid, .mnav .mid { text-align: center; display: grid; gap: 2px; justify-items: center; }
+.daytag { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.iconbtn {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.iconbtn:hover { border-color: var(--muted); }
+.iconbtn:disabled { opacity: 0.35; cursor: default; }
+
+.group { display: grid; gap: 0; }
+.group h3 { padding: 8px 0 4px; color: var(--pc); }
+.p-mind { --pc: var(--mind); }
+.p-body { --pc: var(--body); }
+.p-spirit { --pc: var(--spirit); }
+.p-task { --pc: var(--accent); }
+.habit {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.tick {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 2px solid var(--pc);
+  background: transparent;
+  color: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.tick svg { width: 22px; height: 22px; }
+.tick[aria-pressed="true"] { background: var(--pc); color: var(--surface); }
+.tick:disabled { opacity: 0.35; cursor: default; }
+.hname { font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; overflow-wrap: anywhere; }
+.hdesc { font-size: 0.88rem; color: var(--muted); overflow-wrap: anywhere; }
+.flag, .chip {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.flag { background: var(--warn-soft); color: var(--warn); }
+.chip { background: var(--accent-soft); color: var(--accent); }
+.daynote { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+.task {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.task .tick { width: 34px; height: 34px; border-radius: 9px; margin-left: 3px; }
+.task .tick svg { width: 18px; height: 18px; }
+.ttext { overflow-wrap: anywhere; }
+.ttext.done { text-decoration: line-through; color: var(--muted); }
+.tactions { display: inline-flex; align-items: center; gap: 4px; }
+.empty { font-size: 0.9rem; color: var(--muted); padding: 8px 0; border-top: 1px solid var(--line); margin: 0; }
+.addrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper button {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.stepper button:hover { border-color: var(--muted); }
+.stepper output {
+  min-width: 52px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.witem {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.witem .wname { font-weight: 600; overflow-wrap: anywhere; }
+.witem .wsub { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.witem.off { opacity: 0.6; }
+.wtick {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.wtick svg { width: 18px; height: 18px; }
+.wtick[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.weight { display: inline-flex; align-items: center; gap: 6px; }
+
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
+  height: 36px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  min-width: 0;
+  width: 100%;
+}
+textarea { height: 96px; padding: 8px 10px; resize: vertical; font-size: 0.85rem; }
+.weight input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding-top: 4px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn.primary { background: var(--accent); color: var(--surface); }
+.btn.danger { border-color: var(--warn); color: var(--warn); }
+.btn.danger.armed { background: var(--warn); color: var(--surface); }
+.textbtn {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.daytag .textbtn { font-size: 0.85rem; padding: 0 2px; }
+.xbtn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.xbtn:hover { border-color: var(--line); color: var(--ink); }
+.smallbtn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pc, var(--accent));
+  border-radius: 10px;
+  background: var(--bg);
+}
+.form .title { font-weight: 700; }
+.form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 420px) { .form .row2 { grid-template-columns: 1fr; } }
+.form label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.form .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.form .actions .spacer { flex: 1; }
+.err { color: var(--warn); font-size: 0.85rem; font-weight: 600; margin: 0; }
+.ok { color: var(--accent); font-size: 0.9rem; font-weight: 600; margin: 0; }
+
+.monthhead { display: grid; gap: 6px; }
+.monthhead p { margin: 0; color: var(--muted); font-size: 0.9rem; text-align: center; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 2px solid transparent; }
+.tablewrap { overflow-x: auto; }
+table.month { border-collapse: collapse; width: 100%; min-width: 480px; }
+.month th, .month td { padding: 3px 2px; text-align: center; }
+.month thead th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pc, var(--muted));
+  padding-bottom: 6px;
+  white-space: nowrap;
+}
+.month thead th.plain { color: var(--muted); }
+.month .weekrow th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 12px 4px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.month .weekrow .wmeta { font-family: var(--font-body); font-weight: 400; font-size: 0.85rem; color: var(--muted); margin-left: 8px; }
+.month .emptyrow td { color: var(--muted); padding: 16px 4px; text-align: left; }
+.daybtn {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  width: 100%;
+  text-align: left;
+}
+tr.sel { background: var(--accent-soft); }
+tr.today .daybtn { font-weight: 700; color: var(--accent); }
+tr.future .cell, tr.future .score { opacity: 0.5; }
+.cell {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 2px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.cell.on { background: var(--pc); border-color: var(--pc); }
+.cell.miss2 { border-color: var(--warn); }
+.na { color: var(--line); font-size: 0.9rem; }
+.score { font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.score.alldone { color: var(--accent); }
+
+details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+details[open] summary { margin-bottom: 8px; }
+.stack { display: grid; gap: 8px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+.status { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.status.bad { color: var(--warn); }
+[hidden] { display: none !important; }
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.filebtn { position: relative; }
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .tick, .cell, .wtick { transition: background-color 120ms ease, border-color 120ms ease; }
+}
+@media (max-width: 420px) {
+  h1 { font-size: 2rem; }
+  .tile .big { font-size: 1.7rem; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="intro">
+    <h1>Daily habits</h1>
+    <p>Started on Sunday 1 November 2026. Tick each habit as you do it, and fill in the rest before your phone leaves the room at night.</p>
+    <span class="rule">Never miss twice. If you miss something, it comes first the next day.</span>
+  </header>
+
+  <section class="panel" id="installPanel" aria-labelledby="installTitle" hidden>
+    <h2 id="installTitle">Put this on your home screen</h2>
+    <ul class="steps">
+      <li>iPhone: open this page in Safari, tap the Share button, then Add to Home Screen.</li>
+      <li>Android: open it in Chrome, tap the three dots, then Install app or Add to home screen.</li>
+    </ul>
+    <p class="note">Once it's on your home screen it opens like any other app and works without internet.</p>
+    <div class="tools"><button type="button" class="btn primary" id="installBtn" data-act="install" hidden>Install the app</button></div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+  <div class="panels">
+    <section class="panel" aria-labelledby="dayTitle">
+      <div class="daynav">
+        <button class="iconbtn" data-act="prev" aria-label="Previous day">&lsaquo;</button>
+        <div class="mid">
+          <h2 id="dayTitle">Today</h2>
+          <span class="daytag" id="dayTag"></span>
+        </div>
+        <button class="iconbtn" data-act="next" aria-label="Next day">&rsaquo;</button>
+      </div>
+      <div id="habitList"></div>
+      <div id="taskList"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="weekTitle">
+      <div>
+        <h2 id="weekTitle">Week 1</h2>
+        <span class="daytag" id="weekDates"></span>
+      </div>
+      <div id="weekList"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="monthTitle">
+    <div class="monthhead">
+      <div class="mnav">
+        <button class="iconbtn" data-act="prev-month" aria-label="Previous month">&lsaquo;</button>
+        <div class="mid"><h2 id="monthTitle">November 2026</h2></div>
+        <button class="iconbtn" data-act="next-month" aria-label="Next month">&rsaquo;</button>
+      </div>
+      <p id="monthSummary"></p>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--mind)"></i>Mind</span>
+      <span><i class="sw" style="background:var(--body)"></i>Body</span>
+      <span><i class="sw" style="background:var(--spirit)"></i>Spirit</span>
+      <span><i class="sw" style="border-color:var(--warn)"></i>Missed two days running</span>
+      <span>To-do = one-off things for that day</span>
+    </div>
+    <div class="tablewrap">
+      <table class="month" id="monthTable"></table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="backupTitle">
+    <h2 id="backupTitle">Backup</h2>
+    <p class="note" id="backupNote"></p>
+    <div class="tools">
+      <button type="button" class="btn" data-act="copy-backup">Copy backup</button>
+      <button type="button" class="btn" data-act="download-backup" id="downloadBtn" hidden>Download backup</button>
+      <label class="btn filebtn">Restore from a file<input type="file" id="restoreFile" class="vh" accept=".json,application/json,text/plain"></label>
+    </div>
+    <details>
+      <summary>Paste a backup instead</summary>
+      <div class="stack">
+        <textarea id="restoreText" aria-label="Backup text" placeholder="Paste the text from Copy backup here"></textarea>
+        <div><button type="button" class="btn" data-act="restore-text">Check this backup</button></div>
+      </div>
+    </details>
+    <div id="backupMsg" class="stack" aria-live="polite"></div>
+  </section>
+
+  <p class="status" id="status" role="status">Loading your ticks</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var START = "2026-11-01", START_WEIGHT = 114;
+  var DOC_PATH = "tracker/nov-2026";
+  var LS_KEY = "habit-tracker-nov-2026";
+  var embedded = (function () { try { return window.self !== window.top; } catch (e) { return true; } })();
+  var installed = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+
+  var DEFAULT_HABITS = [
+    { id: "uni", short: "Uni", name: "Uni first", pillar: "mind", full: "One focused hour, phone in another room, before any YouTube", small: "25 minutes", from: START, to: null },
+    { id: "business", short: "Biz", name: "Business", pillar: "mind", full: "Hours towards this week's target", small: "30 minutes", hours: true, from: START, to: null },
+    { id: "move", short: "Move", name: "Move", pillar: "body", full: "A gym session, or a 30-minute walk", small: "A 10-minute walk", from: START, to: null },
+    { id: "food", short: "Food", name: "Eat clean", pillar: "body", full: "No takeaway, fast food or junk snacks", small: "Make the next meal a good one", from: START, to: null },
+    { id: "phone", short: "Phone", name: "Phone away by 11pm", pillar: "body", full: "Out of the bedroom for the night", small: "Same rule", from: START, to: null },
+    { id: "pray", short: "Pray", name: "Pray", pillar: "spirit", full: "10 minutes, first thing in the morning", small: "2 minutes", from: START, to: null },
+    { id: "scripture", short: "Read", name: "Read scripture", pillar: "spirit", full: "One chapter (Mark, then Luke)", small: "A few verses", from: START, to: null },
+    { id: "igbo", short: "Igbo", name: "Igbo", pillar: "spirit", full: "10 minutes with your notes or voice notes", small: "Say one phrase out loud", from: START, to: null }
+  ];
+  var DEFAULT_WEEKLY = [
+    { id: "gym", name: "Gym sessions", type: "count", targets: [{ from: "2026-11-01", n: 3 }, { from: "2026-11-15", n: 4 }], note: "Monday, Wednesday and Friday, plus a fourth day from week 3", from: START, to: null },
+    { id: "spanish", name: "Spanish, 15 minutes", type: "count", targets: [{ from: "2026-11-01", n: 0 }, { from: "2026-11-08", n: 3 }], note: "", from: START, to: null },
+    { id: "mass", name: "Mass on Sunday", type: "check", note: "", from: START, to: null },
+    { id: "cars", name: "An hour on cars", type: "check", note: "Learning, or a job on your own car", from: START, to: null },
+    { id: "call", name: "Call home and use some Igbo", type: "check", note: "", from: START, to: null },
+    { id: "plan", name: "Sunday planning", type: "check", note: "15 minutes on the week ahead", from: START, to: null }
+  ];
+  var DEFAULT_HOURS = [{ from: "2026-11-01", n: 10 }, { from: "2026-11-08", n: 12 }, { from: "2026-11-15", n: 15 }, { from: "2026-11-22", n: 20 }];
+  // the first version counted days 1 to 30 of November 2026 and weeks 1 to 5
+  var OLD_WEEKS = { "1": "2026-11-01", "2": "2026-11-08", "3": "2026-11-15", "4": "2026-11-22", "5": "2026-11-29" };
+  var PILLARS = [{ id: "mind", name: "Mind" }, { id: "body", name: "Body" }, { id: "spirit", name: "Spirit" }];
+  var WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var WD_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  var WD_3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var MON_3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  // ---------- helpers ----------
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function rid(prefix) { return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function cleanStr(v, max) { return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : ""; }
+  function cleanInt(v, lo, hi, def) { v = Math.round(Number(v)); return isFinite(v) && v >= lo && v <= hi ? v : def; }
+  function stripDot(s) { return String(s || "").replace(/[.\s]+$/, ""); }
+  function lcFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  function shortOf(name) { return (cleanStr(name, 60).split(" ")[0] || "").slice(0, 6); }
+  function validId(v) { return typeof v === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(v); }
+
+  // dates are local calendar days written as "YYYY-MM-DD"; noon avoids clock-change surprises
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function iso(dt) { return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
+  function parse(s) { var p = String(s).split("-"); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
+  function isIso(s) { return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && iso(parse(s)) === s; }
+  function addDays(s, n) { var dt = parse(s); dt.setDate(dt.getDate() + n); return iso(dt); }
+  function weekStartOf(s) { var dt = parse(s); dt.setDate(dt.getDate() - dt.getDay()); return iso(dt); }
+  function dow(s) { return parse(s).getDay(); }
+  function monthStart(s) { return s.slice(0, 8) + "01"; }
+  function monthEnd(s) { var dt = parse(monthStart(s)); dt.setMonth(dt.getMonth() + 1); dt.setDate(0); return iso(dt); }
+  function addMonths(s, n) { var dt = parse(monthStart(s)); dt.setMonth(dt.getMonth() + n); return iso(dt); }
+  function nowIso() { var n = new Date(); return iso(new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12)); }
+  function yearBit(dt) { return dt.getFullYear() !== parse(today).getFullYear() ? " " + dt.getFullYear() : ""; }
+  function dayLabel(s) { var dt = parse(s); return WD_3[dt.getDay()] + " " + dt.getDate() + " " + MON_3[dt.getMonth()] + yearBit(dt); }
+  function longLabel(s) { var dt = parse(s); return WEEKDAYS[dt.getDay()] + " " + dt.getDate() + " " + MONTHS[dt.getMonth()] + yearBit(dt); }
+  function monthLabel(s) { var dt = parse(s); return MONTHS[dt.getMonth()] + " " + dt.getFullYear(); }
+  function weekRange(ws) {
+    var a = parse(ws), b = parse(addDays(ws, 6));
+    if (a.getMonth() === b.getMonth()) return a.getDate() + " to " + b.getDate() + " " + MONTHS[a.getMonth()];
+    return a.getDate() + " " + MONTHS[a.getMonth()] + " to " + b.getDate() + " " + MONTHS[b.getMonth()];
+  }
+  function weekNumber(ws) { return Math.round((parse(ws) - parse(weekStartOf(START))) / 864e5 / 7) + 1; }
+  function fmtH(v) { return (Math.round(v * 10) / 10).toString(); }
+  function fmtKg(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+
+  var today = nowIso();
+  var selected = today;
+
+  // ---------- state ----------
+  function blank() { return { v: 3, days: {}, hours: {}, weeks: {}, tasks: {} }; }
+
+  function normSchedule(arr, max) {
+    if (!Array.isArray(arr)) return [];
+    var byFrom = {};
+    arr.forEach(function (e) {
+      if (!e || typeof e !== "object" || !isIso(e.from)) return;
+      byFrom[weekStartOf(e.from)] = cleanInt(e.n, 0, max, 0);
+    });
+    return Object.keys(byFrom).sort().map(function (k) { return { from: k, n: byFrom[k] }; });
+  }
+  function targetAt(sched, ws) {
+    var t = 0;
+    (sched || []).forEach(function (e) { if (e.from <= ws) t = e.n; });
+    return t;
+  }
+  function nextStart(sched, ws) {
+    var list = sched || [];
+    for (var i = 0; i < list.length; i++) if (list[i].from > ws && list[i].n > 0) return list[i].from;
+    return null;
+  }
+  function setFrom(sched, ws, n) {
+    var out = (sched || []).filter(function (e) { return e.from < ws; });
+    out.push({ from: ws, n: n });
+    return out;
+  }
+
+  function oldDay(k) {
+    var n = Number(k);
+    return /^\d{1,2}$/.test(String(k)) && n >= 1 && n <= 30 ? "2026-11-" + pad(n) : null;
+  }
+
+  function normHabit(o, old) {
+    if (!o || typeof o !== "object" || !validId(o.id)) return null;
+    var name = cleanStr(o.name, 60);
+    if (!name) return null;
+    var from, to;
+    if (old) {
+      from = oldDay(o.from) || START;
+      var t = o.to === undefined || o.to === null ? 30 : Number(o.to);
+      to = t >= 30 ? null : t < 1 ? addDays(START, -1) : oldDay(t);
+    } else {
+      from = isIso(o.from) ? o.from : START;
+      to = isIso(o.to) ? o.to : null;
+    }
+    var h = {
+      id: o.id,
+      name: name,
+      short: cleanStr(o.short, 8) || shortOf(name),
+      pillar: ["mind", "body", "spirit"].indexOf(o.pillar) >= 0 ? o.pillar : "mind",
+      full: cleanStr(o.full, 140),
+      small: cleanStr(o.small, 100),
+      from: from,
+      to: to
+    };
+    if (o.hours === true) h.hours = true;
+    return h;
+  }
+  function normWeekly(o, old) {
+    if (!o || typeof o !== "object" || !validId(o.id) || o.id === "weight") return null;
+    var name = cleanStr(o.name, 60);
+    if (!name) return null;
+    var it = { id: o.id, name: name, type: o.type === "count" ? "count" : "check", note: cleanStr(o.note, 120) };
+    if (old) {
+      it.from = OLD_WEEKS[String(o.from || 1)] || START;
+      var t = o.to === undefined || o.to === null ? 4 : Number(o.to);
+      it.to = t >= 4 ? null : t < 1 ? addDays(START, -7) : OLD_WEEKS[String(t)];
+      if (it.type === "count") {
+        var sched = [], last = null;
+        for (var n = 1; n <= 4; n++) {
+          var v = cleanInt(o.targets && o.targets[n], 0, 60, 0);
+          if (v !== last) { sched.push({ from: OLD_WEEKS[n], n: v }); last = v; }
+        }
+        it.targets = sched;
+      }
+    } else {
+      it.from = isIso(o.from) ? weekStartOf(o.from) : START;
+      it.to = isIso(o.to) ? weekStartOf(o.to) : null;
+      if (it.type === "count") it.targets = normSchedule(o.targets, 60);
+    }
+    return it;
+  }
+  function normList(arr, fn, old, cap) {
+    var out = [], seen = {};
+    for (var i = 0; i < arr.length && out.length < cap; i++) {
+      var x = fn(arr[i], old);
+      if (x && !seen[x.id]) { seen[x.id] = true; out.push(x); }
+    }
+    return out;
+  }
+  function normalize(o) {
+    var s = blank();
+    if (!o || typeof o !== "object") return s;
+    var old = !(Number(o.v) >= 3);
+    var dayKey = function (k) { return old ? oldDay(k) : (isIso(k) ? k : null); };
+    var weekKey = function (k) { return old ? (OLD_WEEKS[k] || null) : (isIso(k) && dow(k) === 0 ? k : null); };
+    var k, key, f;
+    if (o.days && typeof o.days === "object") {
+      for (k in o.days) {
+        key = dayKey(k);
+        if (!key || !o.days[k] || typeof o.days[k] !== "object") continue;
+        var day = {};
+        for (f in o.days[k]) if (o.days[k][f] === true) day[f] = true;
+        s.days[key] = day;
+      }
+    }
+    if (o.hours && typeof o.hours === "object") {
+      for (k in o.hours) {
+        key = dayKey(k);
+        var h = Number(o.hours[k]);
+        if (key && isFinite(h) && h > 0) s.hours[key] = h;
+      }
+    }
+    if (o.weeks && typeof o.weeks === "object") {
+      for (k in o.weeks) {
+        key = weekKey(k);
+        if (!key || !o.weeks[k] || typeof o.weeks[k] !== "object") continue;
+        var w = {};
+        for (f in o.weeks[k]) {
+          var v = o.weeks[k][f];
+          if (v === true || (typeof v === "number" && isFinite(v))) w[f] = v;
+        }
+        s.weeks[key] = w;
+      }
+    }
+    if (o.tasks && typeof o.tasks === "object") {
+      for (k in o.tasks) {
+        key = dayKey(k);
+        if (!key || !Array.isArray(o.tasks[k])) continue;
+        var list = [];
+        o.tasks[k].forEach(function (t) {
+          if (!t || typeof t !== "object" || list.length >= 40) return;
+          var text = cleanStr(t.text, 140);
+          if (text) list.push({ id: validId(t.id) ? t.id : rid("t"), text: text, done: t.done === true });
+        });
+        if (list.length) s.tasks[key] = list;
+      }
+    }
+    if (Array.isArray(o.habits)) s.habits = normList(o.habits, normHabit, old, 24);
+    if (Array.isArray(o.weekly)) s.weekly = normList(o.weekly, normWeekly, old, 20);
+    if (!old && Array.isArray(o.hoursTargets)) s.hoursTargets = normSchedule(o.hoursTargets, 80);
+    if (old) {
+      // the old wrap-up week had a one-off "Plan December" item: keep it as a to-do
+      var pd = "2026-11-29";
+      var l = s.tasks[pd] || [];
+      if (!l.some(function (t) { return /^plan december/i.test(t.text); })) {
+        l.push({ id: "t_plandec", text: "Plan December: keep what worked and change what didn't", done: false });
+        s.tasks[pd] = l;
+      }
+    }
+    return s;
+  }
+  function hasData(s) {
+    return ["days", "hours", "weeks", "tasks"].some(function (k) { return Object.keys(s[k]).length > 0; }) || !!s.habits || !!s.weekly || !!s.hoursTargets;
+  }
+
+  var state = blank();
+
+  function habitsList() { return state.habits || DEFAULT_HABITS; }
+  function weeklyList() { return state.weekly || DEFAULT_WEEKLY; }
+  function hoursSched() { return state.hoursTargets || DEFAULT_HOURS; }
+  function ownHabits() { if (!state.habits) state.habits = clone(DEFAULT_HABITS); return state.habits; }
+  function ownWeekly() { if (!state.weekly) state.weekly = clone(DEFAULT_WEEKLY); return state.weekly; }
+  function applies(h, d) { return d >= h.from && (!h.to || d <= h.to); }
+  function activeHabits(d) { return habitsList().filter(function (h) { return applies(h, d); }); }
+  function wApplies(it, ws) { return ws >= it.from && (!it.to || ws <= it.to); }
+
+  function done(d, h) { return !!(state.days[d] && state.days[d][h]); }
+  function hoursOn(d) { var v = Number(state.hours[d]); return isFinite(v) && v > 0 ? v : 0; }
+  function wk(ws) { return state.weeks[ws] || {}; }
+  function tasksFor(d) { return state.tasks[d] || []; }
+  function dayCount(d) {
+    var list = activeHabits(d), c = 0;
+    for (var i = 0; i < list.length; i++) if (done(d, list[i].id)) c++;
+    return { done: c, total: list.length };
+  }
+  function weekHours(ws) { var t = 0; for (var i = 0; i < 7; i++) t += hoursOn(addDays(ws, i)); return t; }
+  function isPast(d) { return d < today; }
+  function missedTwice(d, h) { var y = addDays(d, -1); return isPast(d) && applies(h, d) && applies(h, y) && !done(d, h.id) && !done(y, h.id); }
+  function flagged(d, h) { var y = addDays(d, -1); return y < today && applies(h, d) && applies(h, y) && !done(y, h.id) && !done(d, h.id); }
+  function weeklyDone(ws) {
+    var tot = 0, ok = 0;
+    weeklyList().forEach(function (it) {
+      if (!wApplies(it, ws)) return;
+      if (it.type === "count") {
+        var t = targetAt(it.targets, ws);
+        if (!t) return;
+        tot++;
+        if ((Number(wk(ws)[it.id]) || 0) >= t) ok++;
+      } else {
+        tot++;
+        if (wk(ws)[it.id]) ok++;
+      }
+    });
+    return { done: ok, total: tot };
+  }
+
+  // ---------- changes ----------
+  function setDone(d, h, val) {
+    var day = Object.assign({}, state.days[d]);
+    if (val) day[h] = true; else delete day[h];
+    if (Object.keys(day).length) state.days[d] = day; else delete state.days[d];
+    changed();
+  }
+  function setHours(d, v) {
+    v = Math.max(0, Math.min(16, Math.round(v * 2) / 2));
+    if (v > 0) {
+      state.hours[d] = v;
+      var day = Object.assign({}, state.days[d]);
+      day.business = true;
+      state.days[d] = day;
+    } else {
+      delete state.hours[d];
+    }
+    changed();
+  }
+  function setWeek(ws, k, v) {
+    var w = Object.assign({}, state.weeks[ws]);
+    if (v === false || v === null || v === 0 || (typeof v === "number" && !isFinite(v))) delete w[k];
+    else w[k] = v;
+    if (Object.keys(w).length) state.weeks[ws] = w; else delete state.weeks[ws];
+    changed();
+  }
+  function addTask(d, text) {
+    text = cleanStr(text, 140);
+    if (!text) return;
+    var list = tasksFor(d).slice();
+    if (list.length >= 40) return;
+    list.push({ id: rid("t"), text: text, done: false });
+    state.tasks[d] = list;
+    changed();
+  }
+  function updateTasks(d, fn) {
+    var list = fn(tasksFor(d).map(function (t) { return Object.assign({}, t); }));
+    if (list.length) state.tasks[d] = list; else delete state.tasks[d];
+  }
+
+  // ---------- editing ----------
+  var habitEditMode = false, weeklyEditMode = false;
+  var editing = null; // { kind: "habit" | "weekly" | "hours", id, week, draft, armed, error }
+  var taskDraft = "";
+  var pendingRestore = null;
+
+  function focusSoon(id) { setTimeout(function () { var el = document.getElementById(id); if (el) el.focus(); }, 0); }
+
+  function startHabitEdit(id) {
+    if (id) {
+      var h = habitsList().filter(function (x) { return x.id === id; })[0];
+      if (!h) return;
+      editing = { kind: "habit", id: id, draft: { name: h.name, pillar: h.pillar, full: h.full, small: h.small, from: h.from }, armed: false, error: "" };
+    } else {
+      editing = { kind: "habit", id: null, draft: { name: "", pillar: "mind", full: "", small: "", from: selected > today ? selected : today }, armed: false, error: "" };
+    }
+    render();
+    focusSoon("f-name");
+  }
+  function saveHabit() {
+    var dr = editing.draft;
+    var name = cleanStr(dr.name, 60);
+    if (!name) { editing.error = "Give the habit a name first."; render(); focusSoon("f-name"); return; }
+    if (!isIso(dr.from)) { editing.error = "Pick the day it starts."; render(); focusSoon("f-from"); return; }
+    var pillar = ["mind", "body", "spirit"].indexOf(dr.pillar) >= 0 ? dr.pillar : "mind";
+    var list = ownHabits();
+    if (editing.id === null) {
+      if (list.length >= 24) { editing.error = "That's the limit of 24 habits."; render(); return; }
+      list.push({ id: rid("h"), name: name, short: shortOf(name), pillar: pillar, full: cleanStr(dr.full, 140), small: cleanStr(dr.small, 100), from: dr.from, to: null });
+    } else {
+      list.forEach(function (h) {
+        if (h.id !== editing.id) return;
+        if (h.name !== name) h.short = shortOf(name);
+        h.name = name;
+        h.pillar = pillar;
+        h.full = cleanStr(dr.full, 140);
+        h.small = cleanStr(dr.small, 100);
+        h.from = h.to && dr.from > h.to ? h.to : dr.from;
+      });
+    }
+    editing = null;
+    changed();
+  }
+  function removeHabit() {
+    var id = editing.id;
+    state.habits = ownHabits().filter(function (h) {
+      if (h.id !== id) return true;
+      if (h.from >= today) return false; // never used yet: delete it outright
+      h.to = addDays(today, -1); // keep its ticks for the days it was running
+      return true;
+    });
+    editing = null;
+    changed();
+  }
+
+  function startWeeklyEdit(id, ws) {
+    if (id) {
+      var it = weeklyList().filter(function (x) { return x.id === id; })[0];
+      if (!it) return;
+      var t = it.type === "count" ? targetAt(it.targets, ws) : 0;
+      editing = { kind: "weekly", id: id, week: ws, draft: { name: it.name, note: it.note || "", type: it.type, target: String(t || 1) }, armed: false, error: "" };
+    } else {
+      editing = { kind: "weekly", id: null, week: ws, draft: { name: "", note: "", type: "check", target: "3" }, armed: false, error: "" };
+    }
+    render();
+    focusSoon("w-name");
+  }
+  function saveWeekly() {
+    var dr = editing.draft, ws = editing.week;
+    var name = cleanStr(dr.name, 60);
+    if (!name) { editing.error = "Give the goal a name first."; render(); focusSoon("w-name"); return; }
+    var type = dr.type === "count" ? "count" : "check";
+    var t = cleanInt(dr.target, 0, 60, -1);
+    if (type === "count" && t < 1) { editing.error = "Set how many times a week, from 1 to 60."; render(); focusSoon("w-target"); return; }
+    var list = ownWeekly();
+    if (editing.id === null) {
+      if (list.length >= 20) { editing.error = "That's the limit of 20 weekly goals."; render(); return; }
+      var it = { id: rid("w"), name: name, type: type, note: cleanStr(dr.note, 120), from: ws, to: null };
+      if (type === "count") it.targets = [{ from: ws, n: t }];
+      list.push(it);
+    } else {
+      list.forEach(function (it) {
+        if (it.id !== editing.id) return;
+        it.name = name;
+        it.note = cleanStr(dr.note, 120);
+        if (type === "count") it.targets = it.type === "count" ? setFrom(it.targets, ws, t) : [{ from: it.from, n: t }];
+        else delete it.targets;
+        it.type = type;
+      });
+    }
+    editing = null;
+    changed();
+  }
+  function removeWeekly() {
+    var id = editing.id, cutW = weekStartOf(today);
+    state.weekly = ownWeekly().filter(function (it) {
+      if (it.id !== id) return true;
+      if (it.from >= cutW) return false;
+      it.to = addDays(cutW, -7);
+      return true;
+    });
+    editing = null;
+    changed();
+  }
+  function startHoursEdit(ws) {
+    editing = { kind: "hours", id: "hours", week: ws, draft: { target: String(targetAt(hoursSched(), ws)) }, armed: false, error: "" };
+    render();
+    focusSoon("h-target");
+  }
+  function saveHours() {
+    var t = cleanInt(editing.draft.target, 0, 80, -1);
+    if (t < 0) { editing.error = "Use a number of hours from 0 to 80."; render(); focusSoon("h-target"); return; }
+    state.hoursTargets = setFrom(hoursSched(), editing.week, t);
+    editing = null;
+    changed();
+  }
+
+  // ---------- rendering ----------
+  var $ = function (id) { return document.getElementById(id); };
+
+  function tile(label, big, sub, pct) {
+    var bar = typeof pct === "number" ? '<div class="bar"><span style="width:' + Math.max(0, Math.min(100, pct)) + '%"></span></div>' : "";
+    return '<div class="tile"><span class="label">' + label + '</span><span class="big">' + big + '</span><span class="sub">' + sub + "</span>" + bar + "</div>";
+  }
+
+  function latestWeight() {
+    var keys = Object.keys(state.weeks).sort(), out = null;
+    keys.forEach(function (k) { if (typeof state.weeks[k].weight === "number") out = state.weeks[k].weight; });
+    return out;
+  }
+
+  function renderTiles() {
+    var html = "";
+    var dc = dayCount(today);
+    html += tile("Today", dc.done + " of " + dc.total,
+      dc.total && dc.done === dc.total ? "Everything done" : (dc.total - dc.done) + " still to do", dc.total ? dc.done / dc.total * 100 : 0);
+
+    var ws = weekStartOf(today), ticks = 0, slots = 0;
+    for (var d = ws; d <= today; d = addDays(d, 1)) { var c = dayCount(d); ticks += c.done; slots += c.total; }
+    var wp = slots ? Math.round(ticks / slots * 100) : 0;
+    var wn = weekNumber(ws);
+    html += tile(wn >= 1 ? "This week (week " + wn + ")" : "This week", wp + "%", ticks + " of " + slots + " ticks so far", wp);
+
+    var wh = weekHours(ws), ht = targetAt(hoursSched(), ws);
+    html += ht ? tile("Business this week", fmtH(wh) + " h", "Target " + ht + " hours", wh / ht * 100)
+      : tile("Business this week", fmtH(wh) + " h", "No target set");
+
+    var latest = latestWeight();
+    if (latest === null) {
+      html += tile("Weight", START_WEIGHT + " kg", "Starting point. Weigh in on Sunday morning.");
+    } else {
+      var diff = latest - START_WEIGHT;
+      var sign = diff < 0 ? "−" : diff > 0 ? "+" : "";
+      html += tile("Weight", fmtKg(latest) + " kg", sign + fmtKg(Math.abs(diff)) + " kg since 1 November 2026");
+    }
+    $("tiles").innerHTML = html;
+  }
+
+  function habitForm() {
+    var dr = editing.draft, isNew = editing.id === null;
+    var pill = "";
+    PILLARS.forEach(function (p) { pill += '<option value="' + p.id + '"' + (dr.pillar === p.id ? " selected" : "") + ">" + p.name + "</option>"; });
+    return '<div class="form p-' + esc(dr.pillar) + '" role="group" aria-label="' + (isNew ? "New habit" : "Edit habit") + '">' +
+      '<div class="title">' + (isNew ? "New daily habit" : "Edit habit") + "</div>" +
+      '<label for="f-name">Habit<input type="text" id="f-name" data-field="name" maxlength="60" placeholder="For example: drink 2 litres of water" value="' + esc(dr.name) + '"></label>' +
+      '<div class="row2"><label for="f-pillar">Pillar<select id="f-pillar" data-field="pillar">' + pill + "</select></label>" +
+      '<label for="f-from">' + (isNew ? "Starts on" : "Counts from") + '<input type="date" id="f-from" data-field="from" value="' + esc(dr.from) + '"></label></div>' +
+      '<label for="f-full">Full version<input type="text" id="f-full" data-field="full" maxlength="140" placeholder="What doing it properly looks like" value="' + esc(dr.full) + '"></label>' +
+      '<label for="f-small">Small version for a bad day<input type="text" id="f-small" data-field="small" maxlength="100" placeholder="The minimum that still counts" value="' + esc(dr.small) + '"></label>' +
+      (editing.error ? '<p class="err">' + esc(editing.error) + "</p>" : "") +
+      '<div class="actions"><button type="button" class="btn primary" data-act="save-habit">' + (isNew ? "Add habit" : "Save") + "</button>" +
+      '<button type="button" class="btn" data-act="cancel-edit">Cancel</button><span class="spacer"></span>' +
+      (isNew ? "" : '<button type="button" class="btn danger' + (editing.armed ? " armed" : "") + '" data-act="remove-habit">' + (editing.armed ? "Tap again to remove" : "Remove habit") + "</button>") +
+      "</div></div>";
+  }
+
+  function describe(h) {
+    var parts = [];
+    if (h.full) parts.push(stripDot(h.full));
+    if (h.small) parts.push("Small version: " + lcFirst(stripDot(h.small)));
+    return parts.length ? parts.join(". ") + "." : "";
+  }
+
+  function renderDay() {
+    var d = selected;
+    var dc = dayCount(d);
+    $("dayTitle").textContent = longLabel(d);
+    var y = addDays(today, -1), t = addDays(today, 1);
+    var tag = d === today ? "Today" : d === y ? "Yesterday" : d === t ? "Tomorrow" : d < today ? "Earlier" : "Coming up";
+    $("dayTag").innerHTML = esc(tag) + " · " + dc.done + " of " + dc.total + " done" +
+      (d !== today ? ' · <button type="button" class="textbtn" data-act="today">Go to today</button>' : "");
+
+    var html = "";
+    PILLARS.forEach(function (p) {
+      var list = habitsList().filter(function (h) {
+        if (h.pillar !== p.id) return false;
+        if (applies(h, d)) return true;
+        return habitEditMode && !h.to && h.from > d; // while editing, show habits that start later
+      });
+      var formHere = editing && editing.kind === "habit" && editing.id === null && editing.draft.pillar === p.id;
+      if (!list.length && !formHere) return;
+      html += '<div class="group p-' + p.id + '"><h3>' + p.name + "</h3>";
+      list.forEach(function (h) {
+        if (editing && editing.kind === "habit" && editing.id === h.id) { html += habitForm(); return; }
+        var live = applies(h, d);
+        var on = done(d, h.id);
+        var chips = flagged(d, h) ? '<span class="flag">Missed yesterday, do this first</span>' : "";
+        if (!live) chips += '<span class="chip">Starts ' + esc(dayLabel(h.from)) + "</span>";
+        var right = "";
+        if (habitEditMode) {
+          right = '<button type="button" class="smallbtn" data-act="edit-habit" data-id="' + esc(h.id) + '" aria-label="Edit ' + esc(h.name) + '">Edit</button>';
+        } else if (h.hours) {
+          right = '<div class="stepper" role="group" aria-label="Hours on ' + esc(h.name) + ", " + esc(dayLabel(d)) + '">' +
+            '<button type="button" data-act="hours" data-day="' + d + '" data-step="-0.5" aria-label="Half an hour less">−</button>' +
+            "<output>" + fmtH(hoursOn(d)) + " h</output>" +
+            '<button type="button" data-act="hours" data-day="' + d + '" data-step="0.5" aria-label="Half an hour more">+</button></div>';
+        }
+        html += '<div class="habit">' +
+          '<button type="button" class="tick" data-act="toggle" data-day="' + d + '" data-habit="' + esc(h.id) + '" aria-pressed="' + on + '" aria-label="' + esc(h.name) + " done on " + esc(dayLabel(d)) + '"' + (live ? "" : " disabled") + ">" + CHECK + "</button>" +
+          '<div><div class="hname">' + esc(h.name) + chips + '</div><div class="hdesc">' + esc(describe(h)) + "</div></div>" +
+          right + "</div>";
+      });
+      if (formHere) html += habitForm();
+      html += "</div>";
+    });
+    if (!html) {
+      html = '<p class="empty">' + (d < START ? "Your tracker starts on Sunday 1 November 2026." : "No daily habits on this day. Add one below.") + "</p>";
+    }
+    html += '<div class="tools">' +
+      (editing && editing.kind === "habit" && editing.id === null ? "" : '<button type="button" class="btn" data-act="add-habit">+ Add a habit</button>') +
+      '<button type="button" class="textbtn" data-act="edit-habits">' + (habitEditMode ? "Done editing" : "Edit habits") + "</button></div>" +
+      '<p class="daynote">On a bad day, do the small version. It still gets a tick.</p>';
+    $("habitList").innerHTML = html;
+  }
+
+  function renderTasks() {
+    var d = selected;
+    var list = tasksFor(d);
+    var html = '<div class="group p-task"><h3>To-do for ' + esc(dayLabel(d)) + "</h3>";
+    if (!list.length) html += '<p class="empty">Nothing extra on this day yet. Add one-off things like a deadline, an appointment or a call.</p>';
+    list.forEach(function (t) {
+      var move = !t.done && isPast(d)
+        ? '<button type="button" class="smallbtn" data-act="task-move" data-day="' + d + '" data-id="' + esc(t.id) + '">Move to today</button>' : "";
+      html += '<div class="task">' +
+        '<button type="button" class="tick" data-act="task-toggle" data-day="' + d + '" data-id="' + esc(t.id) + '" aria-pressed="' + t.done + '" aria-label="' + esc(t.text) + ' done">' + CHECK + "</button>" +
+        '<div class="ttext' + (t.done ? " done" : "") + '">' + esc(t.text) + "</div>" +
+        '<div class="tactions">' + move + '<button type="button" class="xbtn" data-act="task-remove" data-day="' + d + '" data-id="' + esc(t.id) + '" aria-label="Remove ' + esc(t.text) + '">×</button></div></div>';
+    });
+    html += '<div class="addrow"><input type="text" id="taskInput" maxlength="140" placeholder="Add something for ' + esc(dayLabel(d)) + '" value="' + esc(taskDraft) + '" aria-label="New to-do for ' + esc(dayLabel(d)) + '">' +
+      '<button type="button" class="btn" data-act="add-task">Add</button></div></div>';
+    $("taskList").innerHTML = html;
+  }
+
+  function weeklyForm() {
+    var dr = editing.draft, isNew = editing.id === null;
+    var from = dayLabel(editing.week);
+    return '<div class="form" role="group" aria-label="' + (isNew ? "New weekly goal" : "Edit weekly goal") + '">' +
+      '<div class="title">' + (isNew ? "New weekly goal, from the week of " + esc(from) : "Edit weekly goal") + "</div>" +
+      '<label for="w-name">Goal<input type="text" id="w-name" data-field="name" maxlength="60" placeholder="For example: cook a new healthy meal" value="' + esc(dr.name) + '"></label>' +
+      '<label for="w-note">Note (optional)<input type="text" id="w-note" data-field="note" maxlength="120" placeholder="Any detail you want to remember" value="' + esc(dr.note) + '"></label>' +
+      '<div class="row2"><label for="w-type">How it\'s tracked<select id="w-type" data-field="type">' +
+      '<option value="check"' + (dr.type === "check" ? " selected" : "") + ">Once a week (tick)</option>" +
+      '<option value="count"' + (dr.type === "count" ? " selected" : "") + ">Several times (count)</option></select></label>" +
+      (dr.type === "count"
+        ? '<label for="w-target">Times per week' + (isNew ? "" : ", from this week on") + '<input type="number" id="w-target" data-field="target" min="1" max="60" step="1" inputmode="numeric" value="' + esc(dr.target) + '"></label>'
+        : "<span></span>") +
+      "</div>" +
+      (editing.error ? '<p class="err">' + esc(editing.error) + "</p>" : "") +
+      '<div class="actions"><button type="button" class="btn primary" data-act="save-weekly">' + (isNew ? "Add goal" : "Save") + "</button>" +
+      '<button type="button" class="btn" data-act="cancel-edit">Cancel</button><span class="spacer"></span>' +
+      (isNew ? "" : '<button type="button" class="btn danger' + (editing.armed ? " armed" : "") + '" data-act="remove-weekly">' + (editing.armed ? "Tap again to remove" : "Remove goal") + "</button>") +
+      "</div></div>";
+  }
+  function hoursForm() {
+    return '<div class="form" role="group" aria-label="Business hours target">' +
+      '<div class="title">Business hours per week</div>' +
+      '<label for="h-target">Hours per week, from this week on (0 for no target)<input type="number" id="h-target" data-field="target" min="0" max="80" step="1" inputmode="numeric" value="' + esc(editing.draft.target) + '"></label>' +
+      (editing.error ? '<p class="err">' + esc(editing.error) + "</p>" : "") +
+      '<div class="actions"><button type="button" class="btn primary" data-act="save-hours">Save</button><button type="button" class="btn" data-act="cancel-edit">Cancel</button></div></div>';
+  }
+
+  function wTickRow(ws, key, label, sub) {
+    var on = !!wk(ws)[key];
+    return '<div class="witem"><div><div class="wname">' + esc(label) + "</div>" + (sub ? '<div class="wsub">' + esc(sub) + "</div>" : "") + "</div>" +
+      '<button type="button" class="wtick" data-act="wtoggle" data-week="' + ws + '" data-key="' + esc(key) + '" aria-pressed="' + on + '" aria-label="' + esc(label) + '">' + CHECK + "</button></div>";
+  }
+
+  function renderWeek() {
+    var ws = weekStartOf(selected);
+    var wn = weekNumber(ws);
+    $("weekTitle").textContent = wn >= 1 ? "Week " + wn : "Before you started";
+    $("weekDates").textContent = weekRange(ws);
+    var html = "";
+
+    if (editing && editing.kind === "hours" && editing.week === ws) {
+      html += hoursForm();
+    } else {
+      var wh = weekHours(ws), ht = targetAt(hoursSched(), ws);
+      var hoursEdit = weeklyEditMode ? '<button type="button" class="smallbtn" data-act="edit-hours" data-week="' + ws + '" aria-label="Edit business hours target">Edit</button>' : "";
+      html += '<div class="witem"><div><div class="wname">Business hours</div><div class="wsub">' + (ht ? "Added up from each day" : "No target this week") + "</div>" +
+        (ht ? '<div class="bar"><span style="width:' + Math.min(100, wh / ht * 100) + '%"></span></div>' : "") + "</div>" +
+        (hoursEdit || '<div class="stepper"><output>' + fmtH(wh) + (ht ? " of " + ht : " h") + "</output></div>") + "</div>";
+    }
+
+    weeklyList().forEach(function (it) {
+      if (!wApplies(it, ws)) return;
+      if (editing && editing.kind === "weekly" && editing.id === it.id) { html += weeklyForm(); return; }
+      var editBtn = '<button type="button" class="smallbtn" data-act="edit-weekly" data-id="' + esc(it.id) + '" data-week="' + ws + '" aria-label="Edit ' + esc(it.name) + '">Edit</button>';
+      if (it.type === "count") {
+        var t = targetAt(it.targets, ws);
+        if (!t) {
+          var nx = nextStart(it.targets, ws);
+          html += '<div class="witem off"><div><div class="wname">' + esc(it.name) + '</div><div class="wsub">' + (nx ? "Starts in the week of " + esc(dayLabel(nx)) : "No target this week") + "</div></div>" + (weeklyEditMode ? editBtn : "") + "</div>";
+          return;
+        }
+        var v = Number(wk(ws)[it.id]) || 0;
+        var sub = "Target " + t + (it.note ? ". " + stripDot(it.note) : "");
+        html += '<div class="witem"><div><div class="wname">' + esc(it.name) + '</div><div class="wsub">' + esc(sub) + "</div></div>" +
+          (weeklyEditMode ? editBtn :
+            '<div class="stepper" role="group" aria-label="' + esc(it.name) + '">' +
+            '<button type="button" data-act="wstep" data-week="' + ws + '" data-key="' + esc(it.id) + '" data-step="-1" aria-label="One fewer">−</button>' +
+            "<output>" + v + " of " + t + "</output>" +
+            '<button type="button" data-act="wstep" data-week="' + ws + '" data-key="' + esc(it.id) + '" data-step="1" aria-label="One more">+</button></div>') + "</div>";
+      } else if (weeklyEditMode) {
+        html += '<div class="witem"><div><div class="wname">' + esc(it.name) + "</div>" + (it.note ? '<div class="wsub">' + esc(it.note) + "</div>" : "") + "</div>" + editBtn + "</div>";
+      } else {
+        html += wTickRow(ws, it.id, it.name, it.note);
+      }
+    });
+    if (editing && editing.kind === "weekly" && editing.id === null) html += weeklyForm();
+
+    var kg = wk(ws).weight;
+    html += '<div class="witem"><div><div class="wname">Sunday weigh-in</div><div class="wsub">' + esc(dayLabel(ws)) + ", first thing</div></div>" +
+      '<label class="weight"><input id="weightInput" data-week="' + ws + '" type="number" inputmode="decimal" step="0.1" min="30" max="250" placeholder="kg" value="' + (typeof kg === "number" ? fmtKg(kg) : "") + '" aria-label="Weight in kilograms, week of ' + esc(dayLabel(ws)) + '"> kg</label></div>';
+    html += '<div class="tools">' +
+      (editing && editing.kind === "weekly" && editing.id === null ? "" : '<button type="button" class="btn" data-act="add-weekly" data-week="' + ws + '">+ Add a weekly goal</button>') +
+      '<button type="button" class="textbtn" data-act="edit-weeklies">' + (weeklyEditMode ? "Done editing" : "Edit weekly goals") + "</button></div>";
+    $("weekList").innerHTML = html;
+  }
+
+  function renderMonth() {
+    var mStart = monthStart(selected), mEnd = monthEnd(selected);
+    $("monthTitle").textContent = monthLabel(mStart);
+    var cols = habitsList().filter(function (h) { return h.from <= mEnd && (!h.to || h.to >= mStart); });
+    var html = '<thead><tr><th class="plain" scope="col">Day</th>';
+    cols.forEach(function (h) { html += '<th scope="col" class="p-' + h.pillar + '" title="' + esc(h.name) + '">' + esc(h.short || shortOf(h.name)) + "</th>"; });
+    html += '<th class="plain" scope="col">To-do</th><th class="plain" scope="col">Done</th></tr></thead><tbody>';
+    for (var ws = weekStartOf(mStart); ws <= mEnd; ws = addDays(ws, 7)) {
+      var meta = [];
+      var ht = targetAt(hoursSched(), ws), wh = weekHours(ws);
+      if (ht) meta.push("business " + fmtH(wh) + "/" + ht + " h");
+      else if (wh) meta.push("business " + fmtH(wh) + " h");
+      var wd = weeklyDone(ws);
+      if (wd.total && ws >= weekStartOf(START)) meta.push("weekly goals " + wd.done + "/" + wd.total);
+      if (typeof wk(ws).weight === "number") meta.push(fmtKg(wk(ws).weight) + " kg");
+      var wn = weekNumber(ws);
+      html += '<tr class="weekrow"><th colspan="' + (cols.length + 3) + '" scope="rowgroup">' + (wn >= 1 ? "Week " + wn : "Week") +
+        '<span class="wmeta">' + weekRange(ws) + (meta.length ? " · " + meta.join(" · ") : "") + "</span></th></tr>";
+      for (var i = 0; i < 7; i++) {
+        var d = addDays(ws, i);
+        if (d < mStart || d > mEnd) continue;
+        var cls = [];
+        if (d === selected) cls.push("sel");
+        if (d === today) cls.push("today");
+        if (d > today) cls.push("future");
+        html += '<tr class="' + cls.join(" ") + '"><th scope="row"><button type="button" class="daybtn" data-act="select" data-day="' + d + '">' + WD_SHORT[dow(d)] + " " + parse(d).getDate() + "</button></th>";
+        cols.forEach(function (h) {
+          if (!applies(h, d)) { html += '<td class="na" aria-hidden="true">·</td>'; return; }
+          var on = done(d, h.id);
+          var c = "cell" + (on ? " on" : "") + (missedTwice(d, h) ? " miss2" : "");
+          html += '<td class="p-' + h.pillar + '"><button type="button" class="' + c + '" data-act="toggle" data-day="' + d + '" data-habit="' + esc(h.id) + '" aria-pressed="' + on + '" aria-label="' + esc(h.name) + ", " + esc(dayLabel(d)) + '"></button></td>';
+        });
+        var tl = tasksFor(d), tdone = tl.filter(function (t) { return t.done; }).length;
+        html += '<td class="score' + (tl.length && tdone === tl.length ? " alldone" : "") + '">' + (tl.length ? tdone + "/" + tl.length : "") + "</td>";
+        var dc = dayCount(d);
+        html += '<td class="score' + (dc.total && dc.done === dc.total ? " alldone" : "") + '">' + (dc.total ? dc.done + "/" + dc.total : "") + "</td></tr>";
+      }
+    }
+    html += "</tbody>";
+    $("monthTable").innerHTML = html;
+
+    var upTo = mEnd < today ? mEnd : today, ticks = 0, slots = 0;
+    for (var x = mStart; x <= upTo; x = addDays(x, 1)) { var c = dayCount(x); ticks += c.done; slots += c.total; }
+    $("monthSummary").textContent = mStart > today ? "This month hasn't started yet"
+      : slots ? (mEnd < today ? "Whole month: " : "Month so far: ") + Math.round(ticks / slots * 100) + "% (" + ticks + " of " + slots + " ticks)"
+      : "Nothing tracked in this month";
+  }
+
+  function renderBackup() {
+    $("backupNote").textContent = embedded
+      ? "This copy saves to your Claude account. To move your ticks into the phone app, tap Copy backup here, then paste it into the app under Backup."
+      : "Your ticks are saved on this device only. Download or copy a backup every week or two so you don't lose them if you change phones.";
+    $("downloadBtn").hidden = embedded;
+    $("installPanel").hidden = embedded || installed;
+  }
+
+  function render() {
+    var a = document.activeElement, keep = null;
+    if (a && a.id && /^(INPUT|SELECT)$/.test(a.tagName) && a.type !== "file") {
+      keep = { id: a.id, value: a.value, s: null, e: null };
+      try { keep.s = a.selectionStart; keep.e = a.selectionEnd; } catch (err) { /* number and date inputs */ }
+    }
+    renderTiles();
+    renderDay();
+    renderTasks();
+    renderWeek();
+    renderMonth();
+    renderBackup();
+    if (keep) {
+      var el = $(keep.id);
+      if (el) {
+        el.value = keep.value;
+        el.focus();
+        try { if (keep.s !== null) el.setSelectionRange(keep.s, keep.e); } catch (err) { /* ignore */ }
+      }
+    }
+  }
+
+  // ---------- backup ----------
+  function backupText() {
+    return JSON.stringify({ app: "habit-tracker", exported: new Date().toISOString(), data: state });
+  }
+  function showBackupMsg(html) { $("backupMsg").innerHTML = html; }
+  function readBackup(text) {
+    var obj;
+    try { obj = JSON.parse(String(text).trim()); } catch (e) { obj = null; }
+    if (!obj || typeof obj !== "object") { showBackupMsg('<p class="err">That doesn\'t look like a backup from this tracker. Copy the whole text and try again.</p>'); return; }
+    var data = obj.app === "habit-tracker" && obj.data ? obj.data : obj;
+    var s = normalize(data);
+    if (!hasData(s)) { showBackupMsg('<p class="err">That backup is empty, so there is nothing to restore.</p>'); return; }
+    pendingRestore = s;
+    var days = Object.keys(s.days).length;
+    var when = obj.exported ? new Date(obj.exported) : null;
+    var whenTxt = when && !isNaN(when) ? " made on " + when.getDate() + " " + MONTHS[when.getMonth()] + " " + when.getFullYear() : "";
+    showBackupMsg('<p class="ok">Backup' + esc(whenTxt) + " found, with ticks on " + days + " day" + (days === 1 ? "" : "s") + ".</p>" +
+      '<div class="tools"><button type="button" class="btn danger" data-act="confirm-restore">Replace what\'s here with this backup</button><button type="button" class="btn" data-act="cancel-restore">Cancel</button></div>');
+  }
+  function copyBackup() {
+    var text = backupText();
+    var fallback = function () {
+      var ta = $("restoreText");
+      showBackupMsg('<p class="note">Your browser didn\'t let me copy automatically. Select all the text below and copy it.</p><textarea id="copyArea" aria-label="Backup text to copy" readonly></textarea>');
+      var area = $("copyArea");
+      area.value = text;
+      area.focus();
+      area.select();
+      if (ta) ta.blur();
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showBackupMsg('<p class="ok">Backup copied. Paste it somewhere safe, like a note or an email to yourself.</p>');
+        }, fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
+  }
+  function downloadBackup() {
+    try {
+      var blob = new Blob([backupText()], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "habit-tracker-backup-" + today + ".json";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      showBackupMsg('<p class="ok">Backup saved as ' + esc(a.download) + ".</p>");
+    } catch (e) {
+      copyBackup();
+    }
+  }
+
+  // ---------- events ----------
+  function submitTask() {
+    var inp = $("taskInput");
+    var text = inp ? inp.value : taskDraft;
+    if (!cleanStr(text, 140)) return;
+    taskDraft = "";
+    if (inp) inp.value = "";
+    addTask(selected, text);
+    focusSoon("taskInput");
+  }
+  function selectDay(d) {
+    selected = d;
+    taskDraft = "";
+    if (editing && (editing.kind === "weekly" || editing.kind === "hours") && weekStartOf(d) !== editing.week) editing = null;
+    render();
+  }
+
+  var installEvent = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    installEvent = e;
+    var b = $("installBtn");
+    if (b) b.hidden = false;
+  });
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-act]");
+    if (!b || b.disabled) return;
+    var act = b.getAttribute("data-act");
+    var d = b.getAttribute("data-day");
+    var id = b.getAttribute("data-id");
+    switch (act) {
+      case "toggle":
+        setDone(d, b.getAttribute("data-habit"), !done(d, b.getAttribute("data-habit")));
+        break;
+      case "hours":
+        setHours(d, hoursOn(d) + Number(b.getAttribute("data-step")));
+        break;
+      case "select":
+        selectDay(d);
+        var panel = $("dayTitle");
+        if (panel && panel.scrollIntoView && window.innerWidth < 780) {
+          var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          panel.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        }
+        break;
+      case "prev": selectDay(addDays(selected, -1)); break;
+      case "next": selectDay(addDays(selected, 1)); break;
+      case "today": selectDay(today); break;
+      case "prev-month":
+      case "next-month":
+        var m = addMonths(selected, act === "prev-month" ? -1 : 1);
+        selectDay(monthStart(today) === m ? today : m);
+        break;
+      case "wtoggle":
+        var ws = b.getAttribute("data-week"), k = b.getAttribute("data-key");
+        setWeek(ws, k, !wk(ws)[k]);
+        break;
+      case "wstep":
+        var ws2 = b.getAttribute("data-week"), k2 = b.getAttribute("data-key");
+        setWeek(ws2, k2, Math.max(0, Math.min(60, (Number(wk(ws2)[k2]) || 0) + Number(b.getAttribute("data-step")))));
+        break;
+      case "add-task": submitTask(); break;
+      case "task-toggle":
+        updateTasks(d, function (l) { l.forEach(function (t) { if (t.id === id) t.done = !t.done; }); return l; });
+        changed();
+        break;
+      case "task-remove":
+        updateTasks(d, function (l) { return l.filter(function (t) { return t.id !== id; }); });
+        changed();
+        break;
+      case "task-move":
+        var moving = tasksFor(d).filter(function (t) { return t.id === id; })[0];
+        if (moving && d !== today) {
+          updateTasks(d, function (l) { return l.filter(function (t) { return t.id !== id; }); });
+          var into = tasksFor(today).slice();
+          into.push({ id: moving.id, text: moving.text, done: false });
+          state.tasks[today] = into;
+          changed();
+        }
+        break;
+      case "edit-habits":
+        habitEditMode = !habitEditMode;
+        if (!habitEditMode && editing && editing.kind === "habit") editing = null;
+        render();
+        break;
+      case "add-habit": startHabitEdit(null); break;
+      case "edit-habit": startHabitEdit(id); break;
+      case "save-habit": if (editing) saveHabit(); break;
+      case "remove-habit":
+        if (!editing) break;
+        if (!editing.armed) { editing.armed = true; render(); } else removeHabit();
+        break;
+      case "edit-weeklies":
+        weeklyEditMode = !weeklyEditMode;
+        if (!weeklyEditMode && editing && (editing.kind === "weekly" || editing.kind === "hours")) editing = null;
+        render();
+        break;
+      case "add-weekly": startWeeklyEdit(null, b.getAttribute("data-week")); break;
+      case "edit-weekly": startWeeklyEdit(id, b.getAttribute("data-week")); break;
+      case "edit-hours": startHoursEdit(b.getAttribute("data-week")); break;
+      case "save-weekly": if (editing) saveWeekly(); break;
+      case "save-hours": if (editing) saveHours(); break;
+      case "remove-weekly":
+        if (!editing) break;
+        if (!editing.armed) { editing.armed = true; render(); } else removeWeekly();
+        break;
+      case "cancel-edit": editing = null; render(); break;
+      case "copy-backup": copyBackup(); break;
+      case "download-backup": downloadBackup(); break;
+      case "restore-text": readBackup($("restoreText").value); break;
+      case "confirm-restore":
+        if (pendingRestore) {
+          state = pendingRestore;
+          pendingRestore = null;
+          editing = null;
+          $("restoreText").value = "";
+          showBackupMsg('<p class="ok">Backup restored.</p>');
+          changed();
+        }
+        break;
+      case "cancel-restore": pendingRestore = null; showBackupMsg(""); break;
+      case "install":
+        if (installEvent) {
+          installEvent.prompt();
+          installEvent = null;
+          b.hidden = true;
+        }
+        break;
+    }
+  });
+
+  function onField(e) {
+    var t = e.target;
+    if (!t || !editing) return;
+    var f = t.getAttribute && t.getAttribute("data-field");
+    if (!f) return;
+    editing.draft[f] = t.value;
+    if (editing.error) editing.error = "";
+    if (e.type === "change" && (f === "type" || f === "pillar")) render();
+  }
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.id === "taskInput") { taskDraft = e.target.value; return; }
+    onField(e);
+  });
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t && t.id === "weightInput") {
+      var ws = t.getAttribute("data-week");
+      var raw = String(t.value).replace(",", ".").trim();
+      if (raw === "") { setWeek(ws, "weight", null); return; }
+      var v = parseFloat(raw);
+      if (isFinite(v) && v >= 30 && v <= 250) setWeek(ws, "weight", Math.round(v * 10) / 10);
+      else render();
+      return;
+    }
+    if (t && t.id === "restoreFile") {
+      var file = t.files && t.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () { readBackup(reader.result); t.value = ""; };
+      reader.onerror = function () { showBackupMsg('<p class="err">That file couldn\'t be read. Try again, or paste the backup text instead.</p>'); };
+      reader.readAsText(file);
+      return;
+    }
+    onField(e);
+  });
+  document.addEventListener("keydown", function (e) {
+    var t = e.target;
+    if (!t) return;
+    if (t.id === "taskInput" && e.key === "Enter") { e.preventDefault(); submitTask(); return; }
+    if (editing && t.getAttribute && t.getAttribute("data-field")) {
+      if (e.key === "Enter" && t.tagName === "INPUT") {
+        e.preventDefault();
+        editing.draft[t.getAttribute("data-field")] = t.value;
+        if (editing.kind === "habit") saveHabit();
+        else if (editing.kind === "hours") saveHours();
+        else saveWeekly();
+      } else if (e.key === "Escape") { e.preventDefault(); editing = null; render(); }
+    }
+  });
+
+  // a new day starts while the app is open or in the background
+  function checkToday() {
+    var n = nowIso();
+    if (n === today) return;
+    var wasToday = selected === today;
+    today = n;
+    if (wasToday) selected = today;
+    render();
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) checkToday(); });
+  window.addEventListener("focus", checkToday);
+  setInterval(checkToday, 60000);
+
+  // ---------- saving ----------
+  var ref = null, mode = "connecting", dirty = false, saving = false, saveTimer = null, loadTimer = null, gotFirst = false, retries = 0;
+
+  function lsGet() { try { var t = window.localStorage.getItem(LS_KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+  function lsSet() { try { window.localStorage.setItem(LS_KEY, JSON.stringify(state)); return true; } catch (e) { return false; } }
+
+  function setStatus(kind) {
+    var el = $("status");
+    var msg = "", bad = false;
+    if (kind === "saving") msg = "Saving";
+    else if (kind === "slow") { msg = "Can't reach your saved ticks yet. Anything you change now is kept on this device until the connection comes back."; bad = true; }
+    else if (kind === "offline") { msg = "Lost the connection to your saved ticks. New changes are kept on this device for now; reload the page later to sync."; bad = true; }
+    else if (kind === "failed") { msg = "That last change couldn't be saved online. It's kept on this device; reload the page later to try again."; bad = true; }
+    else if (kind === "nostore") { msg = "This browser isn't letting the tracker save. Your ticks will be lost when you close it."; bad = true; }
+    else if (mode === "db") msg = gotFirst ? (dirty || saving ? "Saving" : "Everything saved") : "Loading your ticks";
+    else if (mode === "local") msg = embedded ? "Saved on this device only." : "Saved on this device. Works offline.";
+    else msg = "Loading your ticks";
+    el.textContent = msg;
+    el.className = "status" + (bad ? " bad" : "");
+  }
+
+  function changed() {
+    dirty = true;
+    state.v = 3;
+    var stored = lsSet();
+    render();
+    if (mode !== "db") {
+      dirty = false;
+      setStatus(stored ? undefined : "nostore");
+      return;
+    }
+    setStatus("saving");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 700);
+  }
+
+  function flush() {
+    if (!ref || saving || !dirty) { if (!saving) setStatus(); return; }
+    saving = true;
+    dirty = false;
+    ref.set(clone(state)).then(function () {
+      saving = false;
+      retries = 0;
+      if (dirty) flush(); else setStatus();
+    }, function (err) {
+      saving = false;
+      var code = err && err.code;
+      if (code === "unavailable" && retries < 1) {
+        retries++;
+        dirty = true;
+        setTimeout(flush, 600 + Math.random() * 900);
+      } else {
+        retries = 0;
+        mode = "local";
+        setStatus("failed");
+      }
+    });
+  }
+
+  function useLocal(kind) { mode = "local"; setStatus(kind); }
+
+  function connectDb() {
+    var tries = 0;
+    (function attempt() {
+      if (!window.claude || typeof window.claude.use !== "function") {
+        if (tries++ < 6) { setTimeout(attempt, 500); return; }
+        useLocal();
+        return;
+      }
+      var p;
+      try { p = window.claude.use("db"); } catch (e) { useLocal(); return; }
+      Promise.resolve(p).then(function (db) {
+        if (!db) { useLocal(); return; }
+        try { ref = db.doc(DOC_PATH); } catch (e) { useLocal(); return; }
+        mode = "db";
+        setStatus();
+        loadTimer = setTimeout(function () { if (!gotFirst) setStatus("slow"); }, 10000);
+        ref.onSnapshot(function (snap) {
+          if (!snap.metadata || !snap.metadata.fromCache) {
+            if (!gotFirst) { gotFirst = true; clearTimeout(loadTimer); }
+          }
+          if (dirty || saving) return;
+          if (snap.exists) {
+            state = normalize(snap.data());
+            lsSet();
+            render();
+          }
+          setStatus();
+        }, function () {
+          clearTimeout(loadTimer);
+          useLocal("offline");
+        });
+      }, function () { useLocal(); });
+    })();
+  }
+
+  function start() {
+    var local = lsGet();
+    if (local) state = normalize(local);
+    render();
+    if (embedded) {
+      connectDb();
+    } else {
+      useLocal();
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* optional */ }
+      if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+        navigator.serviceWorker.register("sw.js").catch(function () { /* offline support unavailable */ });
+      }
+    }
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>
