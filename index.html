@@ -417,6 +417,87 @@ details[open] summary { margin-bottom: 8px; }
 
 .status { font-size: 0.85rem; color: var(--muted); margin: 0; }
 .status.bad { color: var(--warn); }
+.rem {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.rem.off { opacity: 0.55; }
+.rtime { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rem .wname { font-weight: 700; overflow-wrap: anywhere; }
+.rem .wsub { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.ractions { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.switch {
+  min-width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.switch[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.cks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.form label.ck { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--ink); font-weight: 600; }
+.ck input { width: 18px; height: 18px; accent-color: var(--accent); }
+.ghbox { display: grid; gap: 8px; padding: 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.ghbox h3 { color: var(--accent); padding: 0; }
+.pushstate { display: grid; gap: 8px; }
+.lockpanel { border-color: var(--accent); }
+.lockrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+@media (max-width: 520px) { .lockrow { grid-template-columns: 1fr; } }
+.lockrow label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.lenstep { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+.lenstep button {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.lenstep output {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.btn.big { height: 52px; font-size: 1.1rem; justify-content: center; width: 100%; }
+.lockstats { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.overlay .inner { width: 100%; max-width: 420px; display: grid; gap: 14px; text-align: center; justify-items: center; }
+.overlay .eyebrow { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.overlay .count {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 22vw, 7rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.overlay .what { font-size: 1.1rem; font-weight: 700; }
+.overlay .meta { color: var(--muted); }
+.overlay .bar { width: 100%; height: 10px; }
+.overlay .tip { font-size: 0.9rem; color: var(--muted); max-width: 36ch; }
+body.locked { overflow: hidden; }
 [hidden] { display: none !important; }
 .vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .filebtn { position: relative; }
@@ -450,6 +531,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   </section>
 
   <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+  <section class="panel lockpanel" aria-labelledby="lockTitle">
+    <h2 id="lockTitle">Lock in</h2>
+    <div id="lockBody"></div>
+  </section>
+
 
   <div class="panels">
     <section class="panel" aria-labelledby="dayTitle">
@@ -495,6 +582,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     </div>
   </section>
 
+  <section class="panel" id="remindersPanel" aria-labelledby="remTitle" hidden>
+    <h2 id="remTitle">Reminders</h2>
+    <p class="note">Notifications that nudge you through the day. Change the words, times and days to suit you.</p>
+    <div id="remindersBody"></div>
+    <div id="remMsg" class="stack" aria-live="polite"></div>
+  </section>
+
   <section class="panel" aria-labelledby="backupTitle">
     <h2 id="backupTitle">Backup</h2>
     <p class="note" id="backupNote"></p>
@@ -515,6 +609,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   <p class="status" id="status" role="status">Loading your ticks</p>
 </div>
+
+  <div class="overlay" id="lockOverlay" role="dialog" aria-modal="true" aria-labelledby="lockEyebrow" hidden>
+    <div class="inner" id="lockInner"></div>
+  </div>
 
 <script>
 (function () {
@@ -545,6 +643,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     { id: "plan", name: "Sunday planning", type: "check", note: "15 minutes on the week ahead", from: START, to: null }
   ];
   var DEFAULT_HOURS = [{ from: "2026-11-01", n: 10 }, { from: "2026-11-08", n: 12 }, { from: "2026-11-15", n: 15 }, { from: "2026-11-22", n: 20 }];
+  var DEFAULT_REMINDERS = [
+    { id: "r_morning", time: "07:30", days: [0, 1, 2, 3, 4, 5, 6], title: "Morning", msg: "Pray and read your chapter before you pick up your phone.", habits: ["pray", "scripture"], on: true },
+    { id: "r_sunday", time: "09:00", days: [0], title: "Sunday", msg: "Mass, weigh-in and 15 minutes planning the week.", habits: [], on: true },
+    { id: "r_uni", time: "13:00", days: [1, 2, 3, 4, 5], title: "Uni first", msg: "One focused hour on uni, phone in another room.", habits: ["uni"], on: true },
+    { id: "r_move", time: "18:00", days: [0, 1, 2, 3, 4, 5, 6], title: "Move", msg: "Gym or a 30-minute walk. On a bad day, 10 minutes still counts.", habits: ["move"], on: true },
+    { id: "r_evening", time: "21:30", days: [0, 1, 2, 3, 4, 5, 6], title: "Evening check", msg: "There's still time for the small versions.", habits: ["*"], on: true },
+    { id: "r_phone", time: "22:45", days: [0, 1, 2, 3, 4, 5, 6], title: "Phone away soon", msg: "Fill in today's ticks, then phone out of the bedroom by 11pm.", habits: [], on: true }
+  ];
   // the first version counted days 1 to 30 of November 2026 and weeks 1 to 5
   var OLD_WEEKS = { "1": "2026-11-01", "2": "2026-11-08", "3": "2026-11-15", "4": "2026-11-22", "5": "2026-11-29" };
   var PILLARS = [{ id: "mind", name: "Mind" }, { id: "body", name: "Body" }, { id: "spirit", name: "Spirit" }];
@@ -592,7 +698,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     return a.getDate() + " " + MONTHS[a.getMonth()] + " to " + b.getDate() + " " + MONTHS[b.getMonth()];
   }
   function weekNumber(ws) { return Math.round((parse(ws) - parse(weekStartOf(START))) / 864e5 / 7) + 1; }
-  function fmtH(v) { return (Math.round(v * 10) / 10).toString(); }
+  function fmtH(v) { return (Math.round(v * 100) / 100).toString(); }
   function fmtKg(v) { return (Math.round(v * 10) / 10).toFixed(1); }
 
   var today = nowIso();
@@ -681,6 +787,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     }
     return it;
   }
+  function normReminder(o) {
+    if (!o || typeof o !== "object" || !validId(o.id)) return null;
+    if (typeof o.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(o.time)) return null;
+    var days = Array.isArray(o.days) ? o.days.map(Number).filter(function (n) { return n >= 0 && n <= 6 && n === Math.floor(n); }) : [];
+    days = days.filter(function (n, i) { return days.indexOf(n) === i; }).sort();
+    if (!days.length) days = [0, 1, 2, 3, 4, 5, 6];
+    var habits = Array.isArray(o.habits) ? o.habits.filter(function (h) { return h === "*" || validId(h); }).slice(0, 30) : [];
+    return { id: o.id, time: o.time, days: days, title: cleanStr(o.title, 40), msg: cleanStr(o.msg, 160), habits: habits, on: o.on !== false };
+  }
   function normList(arr, fn, old, cap) {
     var out = [], seen = {};
     for (var i = 0; i < arr.length && out.length < cap; i++) {
@@ -740,6 +855,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     if (Array.isArray(o.habits)) s.habits = normList(o.habits, normHabit, old, 24);
     if (Array.isArray(o.weekly)) s.weekly = normList(o.weekly, normWeekly, old, 20);
     if (!old && Array.isArray(o.hoursTargets)) s.hoursTargets = normSchedule(o.hoursTargets, 80);
+    if (Array.isArray(o.reminders)) s.reminders = normList(o.reminders, normReminder, old, 20);
+    if (o.focus && typeof o.focus === "object") {
+      for (k in o.focus) {
+        var fm = Number(o.focus[k]);
+        if (isIso(k) && isFinite(fm) && fm > 0) { if (!s.focus) s.focus = {}; s.focus[k] = Math.round(fm); }
+      }
+    }
+    if (o.lock && typeof o.lock === "object") {
+      var ls = Number(o.lock.start), lm = cleanInt(o.lock.mins, 15, 480, 0);
+      if (isFinite(ls) && ls > 0 && lm && isIso(o.lock.day)) s.lock = { start: ls, mins: lm, target: validId(o.lock.target) ? o.lock.target : "", day: o.lock.day };
+    }
     if (old) {
       // the old wrap-up week had a one-off "Plan December" item: keep it as a to-do
       var pd = "2026-11-29";
@@ -752,7 +878,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     return s;
   }
   function hasData(s) {
-    return ["days", "hours", "weeks", "tasks"].some(function (k) { return Object.keys(s[k]).length > 0; }) || !!s.habits || !!s.weekly || !!s.hoursTargets;
+    return ["days", "hours", "weeks", "tasks"].some(function (k) { return Object.keys(s[k]).length > 0; }) || !!s.habits || !!s.weekly || !!s.hoursTargets || !!s.reminders || !!s.focus || !!s.lock;
   }
 
   var state = blank();
@@ -762,6 +888,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   function hoursSched() { return state.hoursTargets || DEFAULT_HOURS; }
   function ownHabits() { if (!state.habits) state.habits = clone(DEFAULT_HABITS); return state.habits; }
   function ownWeekly() { if (!state.weekly) state.weekly = clone(DEFAULT_WEEKLY); return state.weekly; }
+  function remindersList() { return state.reminders || DEFAULT_REMINDERS; }
+  function ownReminders() { if (!state.reminders) state.reminders = clone(DEFAULT_REMINDERS); return state.reminders; }
   function applies(h, d) { return d >= h.from && (!h.to || d <= h.to); }
   function activeHabits(d) { return habitsList().filter(function (h) { return applies(h, d); }); }
   function wApplies(it, ws) { return ws >= it.from && (!it.to || ws <= it.to); }
@@ -804,7 +932,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     changed();
   }
   function setHours(d, v) {
-    v = Math.max(0, Math.min(16, Math.round(v * 2) / 2));
+    v = Math.max(0, Math.min(16, Math.round(v * 4) / 4));
     if (v > 0) {
       state.hours[d] = v;
       var day = Object.assign({}, state.days[d]);
@@ -1234,16 +1362,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   function render() {
     var a = document.activeElement, keep = null;
-    if (a && a.id && /^(INPUT|SELECT)$/.test(a.tagName) && a.type !== "file") {
+    if (a && a.id && /^(INPUT|SELECT)$/.test(a.tagName) && a.type !== "file" && a.type !== "checkbox") {
       keep = { id: a.id, value: a.value, s: null, e: null };
       try { keep.s = a.selectionStart; keep.e = a.selectionEnd; } catch (err) { /* number and date inputs */ }
     }
     renderTiles();
+    renderLockPanel();
     renderDay();
     renderTasks();
     renderWeek();
     renderMonth();
+    renderReminders();
     renderBackup();
+    renderLockOverlay();
     if (keep) {
       var el = $(keep.id);
       if (el) {
@@ -1274,23 +1405,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       '<div class="tools"><button type="button" class="btn danger" data-act="confirm-restore">Replace what\'s here with this backup</button><button type="button" class="btn" data-act="cancel-restore">Cancel</button></div>');
   }
   function copyBackup() {
-    var text = backupText();
-    var fallback = function () {
-      var ta = $("restoreText");
-      showBackupMsg('<p class="note">Your browser didn\'t let me copy automatically. Select all the text below and copy it.</p><textarea id="copyArea" aria-label="Backup text to copy" readonly></textarea>');
-      var area = $("copyArea");
-      area.value = text;
-      area.focus();
-      area.select();
-      if (ta) ta.blur();
-    };
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function () {
-          showBackupMsg('<p class="ok">Backup copied. Paste it somewhere safe, like a note or an email to yourself.</p>');
-        }, fallback);
-      } else fallback();
-    } catch (e) { fallback(); }
+    copyText(backupText(), showBackupMsg, '<p class="ok">Backup copied. Paste it somewhere safe, like a note or an email to yourself.</p>');
   }
   function downloadBackup() {
     try {
@@ -1306,6 +1421,459 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     } catch (e) {
       copyBackup();
     }
+  }
+
+  // ---------- lock in ----------
+  var LOCK_MIN = 15, LOCK_MAX = 480;
+  var lockPrefs = (function () {
+    try { var p = JSON.parse(localStorage.getItem("habits-lock-prefs") || "{}"); return { mins: cleanInt(p.mins, LOCK_MIN, LOCK_MAX, 60), target: typeof p.target === "string" ? p.target : "uni" }; }
+    catch (e) { return { mins: 60, target: "uni" }; }
+  })();
+  var lockResult = null, lockArmed = false, lockTimer = null, lockFinishing = false;
+
+  function saveLockPrefs() { try { localStorage.setItem("habits-lock-prefs", JSON.stringify(lockPrefs)); } catch (e) { /* ignore */ } }
+  function fmtDur(m) {
+    m = Math.max(0, Math.round(m));
+    var h = Math.floor(m / 60), r = m % 60;
+    if (!h) return r + " min";
+    return h + " h" + (r ? " " + r + " min" : "");
+  }
+  function fmtCount(ms) {
+    var t = Math.max(0, Math.ceil(ms / 1000));
+    var h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    return (h ? h + ":" + pad(m) : m) + ":" + pad(sec);
+  }
+  function clockTime(ms) { var d = new Date(ms); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function lockTargets() { return activeHabits(today); }
+  function lockEnd(s) { return s.start + s.mins * 60000; }
+  function focusOn(d) { return Number(state.focus && state.focus[d]) || 0; }
+  function weekFocus(ws) { var t = 0; for (var i = 0; i < 7; i++) t += focusOn(addDays(ws, i)); return t; }
+
+  function startLock() {
+    if (state.lock) return;
+    var targets = lockTargets();
+    var target = targets.some(function (h) { return h.id === lockPrefs.target; }) ? lockPrefs.target : "";
+    state.lock = { start: Date.now(), mins: lockPrefs.mins, target: target, day: today };
+    lockResult = null;
+    lockArmed = false;
+    changed();
+  }
+
+  // called when the time is up, or with early = true when you end it yourself
+  function finishLock(early) {
+    var s = state.lock;
+    if (!s || lockFinishing) return;
+    lockFinishing = true;
+    var mins = early ? Math.floor((Date.now() - s.start) / 60000) : s.mins;
+    mins = Math.max(0, Math.min(s.mins, mins));
+    if (!state.focus) state.focus = {};
+    if (mins > 0) state.focus[s.day] = focusOn(s.day) + mins;
+    var h = s.target ? habitsList().filter(function (x) { return x.id === s.target; })[0] : null;
+    var note = "";
+    if (h && h.hours && mins > 0) {
+      state.hours[s.day] = Math.round((hoursOn(s.day) + mins / 60) * 100) / 100;
+      var bd = Object.assign({}, state.days[s.day]); bd[h.id] = true; state.days[s.day] = bd;
+      note = fmtDur(mins) + " added to " + h.name + ", and it's ticked.";
+    } else if (h && !early) {
+      var day = Object.assign({}, state.days[s.day]); day[h.id] = true; state.days[s.day] = day;
+      note = h.name + " is ticked.";
+    } else if (h && early) {
+      note = h.name + " isn't ticked, because you ended early.";
+    }
+    lockResult = { mins: mins, early: early, note: note, planned: s.mins };
+    delete state.lock;
+    lockArmed = false;
+    changed();
+    lockFinishing = false;
+  }
+
+  function renderLockPanel() {
+    var body = $("lockBody");
+    if (!body) return;
+    var targets = lockTargets();
+    var opts = '<option value=""' + (lockPrefs.target === "" ? " selected" : "") + ">Nothing, just focus</option>";
+    targets.forEach(function (h) {
+      opts += '<option value="' + esc(h.id) + '"' + (lockPrefs.target === h.id ? " selected" : "") + ">" + esc(h.name) + (h.hours ? " (adds the time to your hours)" : "") + "</option>";
+    });
+    var ws = weekStartOf(today);
+    body.innerHTML =
+      '<p class="note">Pick how long, then lock in. Turn on Focus mode (Android) or an Opal session (iPhone) at the same time so your other apps are blocked too.</p>' +
+      '<div class="lockrow">' +
+      '<label>How long<div class="lenstep" role="group" aria-label="Lock in length">' +
+      '<button type="button" data-act="lock-len" data-step="-15" aria-label="15 minutes less"' + (lockPrefs.mins <= LOCK_MIN ? " disabled" : "") + ">−</button>" +
+      "<output>" + fmtDur(lockPrefs.mins) + "</output>" +
+      '<button type="button" data-act="lock-len" data-step="15" aria-label="15 minutes more"' + (lockPrefs.mins >= LOCK_MAX ? " disabled" : "") + ">+</button></div></label>" +
+      '<label for="lockTarget">Count it towards<select id="lockTarget" data-lockfield="target">' + opts + "</select></label></div>" +
+      '<button type="button" class="btn primary big" data-act="lock-start">Lock in for ' + fmtDur(lockPrefs.mins) + "</button>" +
+      '<p class="lockstats">Locked in today: ' + fmtDur(focusOn(today)) + " · this week: " + fmtDur(weekFocus(ws)) + "</p>";
+  }
+
+  function renderLockOverlay() {
+    var ov = $("lockOverlay"), inner = $("lockInner");
+    var s = state.lock;
+    if (!s && !lockResult) {
+      ov.hidden = true;
+      document.body.classList.remove("locked");
+      stopLockTimer();
+      return;
+    }
+    ov.hidden = false;
+    document.body.classList.add("locked");
+    if (s) {
+      var left = lockEnd(s) - Date.now();
+      var h = s.target ? habitName(s.target) : null;
+      var pct = Math.min(100, Math.max(0, (Date.now() - s.start) / (s.mins * 60000) * 100));
+      inner.innerHTML =
+        '<div class="eyebrow" id="lockEyebrow">Locked in</div>' +
+        '<div class="count" id="lockCount" aria-live="off">' + fmtCount(left) + "</div>" +
+        '<div class="what">' + (h ? "For " + esc(h) : "Just focus") + "</div>" +
+        '<div class="meta">' + fmtDur(s.mins) + " · ends at " + clockTime(lockEnd(s)) + "</div>" +
+        '<div class="bar"><span id="lockBar" style="width:' + pct + '%"></span></div>' +
+        '<p class="tip">Put the phone face down. You can leave this screen and the timer keeps going.</p>' +
+        '<button type="button" class="btn danger' + (lockArmed ? " armed" : "") + '" data-act="lock-end">' + (lockArmed ? "Tap again to end now" : "End early") + "</button>";
+      startLockTimer();
+    } else {
+      var r = lockResult;
+      inner.innerHTML =
+        '<div class="eyebrow" id="lockEyebrow">' + (r.early ? "Ended early" : "Done") + "</div>" +
+        '<div class="count">' + fmtDur(r.mins) + "</div>" +
+        '<div class="what">' + (r.early ? "locked in out of " + fmtDur(r.planned) : "locked in. That's the full session.") + "</div>" +
+        (r.note ? '<div class="meta">' + esc(r.note) + "</div>" : "") +
+        '<button type="button" class="btn primary big" data-act="lock-close">Back to my habits</button>';
+      stopLockTimer();
+    }
+  }
+
+  function tickLock() {
+    var s = state.lock;
+    if (!s) { stopLockTimer(); return; }
+    var left = lockEnd(s) - Date.now();
+    if (left <= 0) {
+      finishLock(false);
+      try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) { /* not supported */ }
+      return;
+    }
+    var c = $("lockCount"), b = $("lockBar");
+    if (c) c.textContent = fmtCount(left);
+    if (b) b.style.width = Math.min(100, (Date.now() - s.start) / (s.mins * 60000) * 100) + "%";
+  }
+  function startLockTimer() { if (!lockTimer) lockTimer = setInterval(tickLock, 1000); }
+  function stopLockTimer() { if (lockTimer) { clearInterval(lockTimer); lockTimer = null; } }
+
+  // ---------- reminders (phone app only) ----------
+  function daysText(days) {
+    var k = days.join(",");
+    if (k === "0,1,2,3,4,5,6") return "Every day";
+    if (k === "1,2,3,4,5") return "Weekdays";
+    if (k === "0,6") return "Weekends";
+    return [1, 2, 3, 4, 5, 6, 0].filter(function (d) { return days.indexOf(d) >= 0; }).map(function (d) { return WD_3[d]; }).join(", ");
+  }
+  function habitName(id) { var h = habitsList().filter(function (x) { return x.id === id; })[0]; return h ? h.name : null; }
+  function mentionText(r) {
+    if (!r.habits.length) return "";
+    if (r.habits.indexOf("*") >= 0) return "Lists any habits you haven't ticked yet";
+    var names = r.habits.map(habitName).filter(Boolean);
+    return names.length ? "Lists " + names.join(", ") + " if not ticked yet" : "";
+  }
+  // the same wording rules live in sw.js, which builds the real notification on the phone
+  function composeReminder(r, snap, day) {
+    var title = r.title || "Habits";
+    var body = r.msg || "Time to check your habits.";
+    if (r.habits && r.habits.length) {
+      var all = r.habits.indexOf("*") >= 0;
+      var ticks = (snap.days && snap.days[day]) || {};
+      var left = (snap.habits || []).filter(function (h) {
+        return day >= h.from && (!h.to || day <= h.to) && (all || r.habits.indexOf(h.id) >= 0) && !ticks[h.id];
+      }).map(function (h) { return h.name; });
+      if (left.length) body += "\nStill to do: " + left.join(", ") + ".";
+      else body += all ? "\nEverything is ticked off today. Nice work." : "\nAlready done today. Nice work.";
+    }
+    return { title: title, body: body, tag: "r-" + r.id + "-" + day };
+  }
+  function snapshotData() {
+    return {
+      habits: habitsList().map(function (h) { return { id: h.id, name: h.name, from: h.from, to: h.to || null }; }),
+      days: state.days,
+      reminders: remindersList()
+    };
+  }
+
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error("no storage")); return; }
+      var req = indexedDB.open("habit-tracker", 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore("kv"); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var q = db.transaction("kv", "readonly").objectStore("kv").get(key);
+        q.onsuccess = function () { resolve(q.result); };
+        q.onerror = function () { reject(q.error); };
+      });
+    });
+  }
+  function idbSet(key, value) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("kv", "readwrite");
+        tx.objectStore("kv").put(value, key);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function writeSnapshot() {
+    if (embedded) return;
+    try { idbSet("snapshot", clone(snapshotData())).catch(function () {}); } catch (e) { /* storage unavailable */ }
+  }
+
+  var swRegistered = false;
+  var pushState = { permission: "default", subscribed: false, vapid: null, sub: null, busy: false };
+  function pushSupported() {
+    return !embedded && swRegistered && "PushManager" in window && "Notification" in window;
+  }
+  function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+  function b64url(buf) {
+    var b = new Uint8Array(buf), s = "";
+    for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function fromB64url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"; } catch (e) { return "Europe/London"; } }
+  function remMsg(html) { $("remMsg").innerHTML = html; }
+
+  // the app makes its own key pair; the private half only goes into your GitHub secret
+  function getVapid() {
+    return idbGet("vapid").then(function (v) {
+      if (v && v.pub && v.priv) return v;
+      return crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]).then(function (kp) {
+        return Promise.all([crypto.subtle.exportKey("raw", kp.publicKey), crypto.subtle.exportKey("jwk", kp.privateKey)]);
+      }).then(function (r) {
+        var keys = { pub: b64url(r[0]), priv: r[1].d };
+        return idbSet("vapid", keys).then(function () { return keys; });
+      });
+    });
+  }
+
+  function initPush() {
+    if (!pushSupported()) { renderReminders(); return; }
+    pushState.permission = Notification.permission;
+    Promise.all([idbGet("vapid"), navigator.serviceWorker.ready]).then(function (r) {
+      pushState.vapid = r[0] || null;
+      return r[1].pushManager.getSubscription();
+    }).then(function (sub) {
+      pushState.subscribed = !!(sub && pushState.vapid);
+      pushState.sub = sub ? sub.toJSON() : null;
+      renderReminders();
+    }).catch(function () { renderReminders(); });
+  }
+
+  function turnOnPush() {
+    if (pushState.busy) return;
+    pushState.busy = true;
+    remMsg('<p class="note">Asking your phone for permission.</p>');
+    var ask;
+    try { ask = Promise.resolve(Notification.requestPermission()); } catch (e) { ask = Promise.reject(e); }
+    ask.then(function (perm) {
+      pushState.permission = perm;
+      if (perm !== "granted") throw new Error("denied");
+      return Promise.all([navigator.serviceWorker.ready, getVapid()]);
+    }).then(function (r) {
+      var reg = r[0], keys = r[1];
+      pushState.vapid = keys;
+      return reg.pushManager.getSubscription().then(function (existing) {
+        if (!existing) return null;
+        var k = existing.options && existing.options.applicationServerKey;
+        if (k && b64url(k) === keys.pub) return existing;
+        return existing.unsubscribe().then(function () { return null; });
+      }).then(function (sub) {
+        return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64url(keys.pub) });
+      });
+    }).then(function (sub) {
+      pushState.sub = sub.toJSON();
+      pushState.subscribed = true;
+      pushState.busy = false;
+      writeSnapshot();
+      remMsg('<p class="ok">Notifications are on. Next, copy the setup code into GitHub (step 2 below).</p>');
+      renderReminders();
+    }).catch(function (e) {
+      pushState.busy = false;
+      if (e && e.message === "denied") {
+        remMsg('<p class="err">Notifications are switched off for this app. Turn them on for Habits in your phone\'s settings, then tap the button again.</p>');
+      } else {
+        remMsg('<p class="err">Couldn\'t turn on notifications (' + esc((e && e.message) || "unknown error") + "). Check you have internet and try again.</p>");
+      }
+      renderReminders();
+    });
+  }
+
+  function setupTimes() {
+    return remindersList().filter(function (r) { return r.on; })
+      .map(function (r) { return { id: r.id, t: r.time, d: r.days }; })
+      .sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : 0; });
+  }
+  function setupSig() { return JSON.stringify([setupTimes(), tzName(), pushState.sub && pushState.sub.endpoint]); }
+  function copiedSig() { try { return localStorage.getItem("habits-push-copied"); } catch (e) { return null; } }
+  function setupCode() {
+    return JSON.stringify({
+      app: "habit-tracker-push", v: 1, tz: tzName(),
+      vapidPublic: pushState.vapid.pub, vapidPrivate: pushState.vapid.priv,
+      sub: pushState.sub, times: setupTimes()
+    });
+  }
+  function copySetup() {
+    if (!pushState.vapid || !pushState.sub) { remMsg('<p class="err">Turn on notifications first.</p>'); return; }
+    var sig = setupSig();
+    copyText(setupCode(), remMsg, '<p class="ok">Setup code copied. Paste it into the REMINDER_SETUP secret on GitHub.</p>', function () {
+      try { localStorage.setItem("habits-push-copied", sig); } catch (e) { /* ignore */ }
+      renderReminders();
+    });
+  }
+  function testHere() {
+    navigator.serviceWorker.ready.then(function (reg) {
+      var list = remindersList().filter(function (x) { return x.on; });
+      var r = list[0] || remindersList()[0];
+      var n = r ? composeReminder(r, snapshotData(), today) : { title: "Habits", body: "This is a test reminder." };
+      return reg.showNotification(n.title, { body: n.body, tag: "test-here", icon: "icons/icon-192.png", badge: "icons/icon-192.png" });
+    }).then(function () {
+      remMsg('<p class="ok">Test sent. If nothing appeared, check notifications are allowed for Habits in your phone\'s settings and that Focus or Do Not Disturb is off.</p>');
+    }, function (e) {
+      remMsg('<p class="err">Couldn\'t show a test (' + esc((e && e.message) || "unknown error") + ").</p>");
+    });
+  }
+
+  function reminderForm() {
+    var dr = editing.draft, isNew = editing.id === null;
+    var days = [1, 2, 3, 4, 5, 6, 0].map(function (d) {
+      return '<label class="ck"><input type="checkbox" data-remday="' + d + '"' + (dr.days.indexOf(d) >= 0 ? " checked" : "") + "> " + WD_3[d] + "</label>";
+    }).join("");
+    var picks = "";
+    if (dr.mode === "pick") {
+      picks = '<div class="cks" role="group" aria-label="Habits to list">' + habitsList().filter(function (h) { return !h.to || h.to >= today; }).map(function (h) {
+        return '<label class="ck"><input type="checkbox" data-remhabit="' + esc(h.id) + '"' + (dr.picked.indexOf(h.id) >= 0 ? " checked" : "") + "> " + esc(h.name) + "</label>";
+      }).join("") + "</div>";
+    }
+    return '<div class="form" role="group" aria-label="' + (isNew ? "New reminder" : "Edit reminder") + '">' +
+      '<div class="title">' + (isNew ? "New reminder" : "Edit reminder") + "</div>" +
+      '<div class="row2"><label for="r-time">Time<input type="time" id="r-time" data-field="time" value="' + esc(dr.time) + '"></label>' +
+      '<label for="r-title">Title<input type="text" id="r-title" data-field="title" maxlength="40" placeholder="For example: Morning" value="' + esc(dr.title) + '"></label></div>' +
+      '<label for="r-msg">Message<input type="text" id="r-msg" data-field="msg" maxlength="160" placeholder="What you want it to say to you" value="' + esc(dr.msg) + '"></label>' +
+      '<div><div class="title" style="font-size:0.85rem;color:var(--muted)">Days</div><div class="cks" role="group" aria-label="Days">' + days + "</div></div>" +
+      '<label for="r-mode">Add the habits you haven\'t ticked yet<select id="r-mode" data-field="mode">' +
+      '<option value="none"' + (dr.mode === "none" ? " selected" : "") + ">No, just the message</option>" +
+      '<option value="all"' + (dr.mode === "all" ? " selected" : "") + ">Yes, any habit not ticked</option>" +
+      '<option value="pick"' + (dr.mode === "pick" ? " selected" : "") + ">Only the ones I pick</option></select></label>" +
+      picks +
+      (editing.error ? '<p class="err">' + esc(editing.error) + "</p>" : "") +
+      '<div class="actions"><button type="button" class="btn primary" data-act="save-rem">' + (isNew ? "Add reminder" : "Save") + "</button>" +
+      '<button type="button" class="btn" data-act="cancel-edit">Cancel</button><span class="spacer"></span>' +
+      (isNew ? "" : '<button type="button" class="btn danger' + (editing.armed ? " armed" : "") + '" data-act="remove-rem">' + (editing.armed ? "Tap again to delete" : "Delete reminder") + "</button>") +
+      "</div></div>";
+  }
+  function startReminderEdit(id) {
+    if (id) {
+      var r = remindersList().filter(function (x) { return x.id === id; })[0];
+      if (!r) return;
+      var mode = !r.habits.length ? "none" : r.habits.indexOf("*") >= 0 ? "all" : "pick";
+      editing = { kind: "reminder", id: id, draft: { time: r.time, title: r.title, msg: r.msg, days: r.days.slice(), mode: mode, picked: mode === "pick" ? r.habits.slice() : [] }, armed: false, error: "" };
+    } else {
+      editing = { kind: "reminder", id: null, draft: { time: "20:00", title: "", msg: "", days: [0, 1, 2, 3, 4, 5, 6], mode: "none", picked: [] }, armed: false, error: "" };
+    }
+    renderReminders();
+    focusSoon(id ? "r-msg" : "r-time");
+  }
+  function saveReminder() {
+    var dr = editing.draft;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(dr.time || "")) { editing.error = "Pick a time."; renderReminders(); focusSoon("r-time"); return; }
+    if (!dr.days.length) { editing.error = "Pick at least one day."; renderReminders(); return; }
+    var title = cleanStr(dr.title, 40), msg = cleanStr(dr.msg, 160);
+    if (!title && !msg) { editing.error = "Write a title or a message."; renderReminders(); focusSoon("r-msg"); return; }
+    var habits = dr.mode === "all" ? ["*"] : dr.mode === "pick" ? dr.picked.slice() : [];
+    if (dr.mode === "pick" && !habits.length) { editing.error = "Tick at least one habit, or choose a different option."; renderReminders(); return; }
+    var days = dr.days.slice().sort();
+    var list = ownReminders();
+    if (editing.id === null) {
+      if (list.length >= 20) { editing.error = "That's the limit of 20 reminders."; renderReminders(); return; }
+      list.push({ id: rid("r"), time: dr.time, days: days, title: title, msg: msg, habits: habits, on: true });
+    } else {
+      list.forEach(function (r) {
+        if (r.id !== editing.id) return;
+        r.time = dr.time; r.days = days; r.title = title; r.msg = msg; r.habits = habits;
+      });
+    }
+    editing = null;
+    changed();
+  }
+
+  function renderReminders() {
+    var panel = $("remindersPanel");
+    panel.hidden = embedded;
+    if (embedded) return;
+    var html = '<div class="pushstate">';
+    if (!pushSupported()) {
+      if (isIOS() && !installed) html += '<p class="note">On iPhone, notifications only work once the app is on your home screen. Add it, open it from there, then come back here.</p>';
+      else if (!swRegistered) html += '<p class="note">Notifications work once the app is online at its GitHub address and added to your home screen.</p>';
+      else html += '<p class="err">This browser can\'t show notifications. Use Safari on iPhone or Chrome on Android.</p>';
+    } else if (pushState.permission === "denied") {
+      html += '<p class="err">Notifications are switched off for this app. Turn them on for Habits in your phone\'s settings, then reopen the app.</p>';
+    } else if (!pushState.subscribed) {
+      html += '<p class="note">Step 1: let the app send you notifications. Your phone will ask for permission.</p>' +
+        '<div class="tools"><button type="button" class="btn primary" data-act="push-on"' + (pushState.busy ? " disabled" : "") + ">Turn on notifications</button></div>";
+    } else {
+      html += '<p class="ok">Notifications are on for this phone.</p><div class="tools"><button type="button" class="btn" data-act="push-test">Test on this phone</button></div>';
+    }
+    html += "</div>";
+
+    var list = remindersList().slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+    html += '<div class="group">';
+    list.forEach(function (r) {
+      if (editing && editing.kind === "reminder" && editing.id === r.id) { html += reminderForm(); return; }
+      var mention = mentionText(r);
+      html += '<div class="rem' + (r.on ? "" : " off") + '"><div class="rtime">' + esc(r.time) + "</div>" +
+        '<div><div class="wname">' + esc(r.title || "Habits") + '</div><div class="wsub">' + esc(daysText(r.days)) + (r.msg ? " · " + esc(r.msg) : "") + "</div>" +
+        (mention ? '<div class="wsub">' + esc(mention) + "</div>" : "") + "</div>" +
+        '<div class="ractions"><button type="button" class="switch" data-act="rem-toggle" data-id="' + esc(r.id) + '" aria-pressed="' + r.on + '" aria-label="' + esc((r.title || "Reminder") + " at " + r.time) + '">' + (r.on ? "On" : "Off") + "</button>" +
+        '<button type="button" class="smallbtn" data-act="edit-rem" data-id="' + esc(r.id) + '">Edit</button></div></div>';
+    });
+    if (!list.length) html += '<p class="empty">No reminders yet.</p>';
+    if (editing && editing.kind === "reminder" && editing.id === null) html += reminderForm();
+    html += "</div>";
+    html += '<div class="tools">' + (editing && editing.kind === "reminder" && editing.id === null ? "" : '<button type="button" class="btn" data-act="add-rem">+ Add a reminder</button>') + "</div>";
+
+    if (pushState.subscribed) {
+      var stale = copiedSig() !== setupSig();
+      html += '<div class="ghbox"><h3>Step 2: send them from GitHub</h3>' +
+        '<p class="note">GitHub sends each reminder to your phone at the right time. Copy this setup code into the REMINDER_SETUP secret in your GitHub repo. Copy it again whenever you change a time or a day, or add, delete or switch off a reminder. Changing the words doesn\'t need it.</p>' +
+        (stale ? '<div><span class="flag">' + (copiedSig() ? "Times have changed since you last copied this" : "Not copied yet") + "</span></div>" : '<div><span class="chip">No changes since your last copy</span></div>') +
+        '<div class="tools"><button type="button" class="btn primary" data-act="copy-setup">Copy setup code</button></div></div>';
+    }
+    $("remindersBody").innerHTML = html;
+  }
+
+  function copyText(text, show, okHtml, after) {
+    var fallback = function () {
+      show('<p class="note">Your phone didn\'t let the app copy automatically. Select all the text below and copy it.</p><textarea id="copyArea" aria-label="Text to copy" readonly></textarea>');
+      var area = $("copyArea");
+      area.value = text;
+      area.focus();
+      area.select();
+      if (after) after();
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { show(okHtml); if (after) after(); }, fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
   }
 
   // ---------- events ----------
@@ -1416,6 +1984,37 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         if (!editing.armed) { editing.armed = true; render(); } else removeWeekly();
         break;
       case "cancel-edit": editing = null; render(); break;
+      case "lock-len":
+        lockPrefs.mins = Math.max(LOCK_MIN, Math.min(LOCK_MAX, lockPrefs.mins + Number(b.getAttribute("data-step"))));
+        saveLockPrefs();
+        renderLockPanel();
+        break;
+      case "lock-start": startLock(); break;
+      case "lock-end":
+        if (!lockArmed) { lockArmed = true; renderLockOverlay(); setTimeout(function () { if (lockArmed && state.lock) { lockArmed = false; renderLockOverlay(); } }, 5000); }
+        else finishLock(true);
+        break;
+      case "lock-close": lockResult = null; render(); break;
+      case "push-on": turnOnPush(); break;
+      case "push-test": testHere(); break;
+      case "copy-setup": copySetup(); break;
+      case "add-rem": startReminderEdit(null); break;
+      case "edit-rem": startReminderEdit(id); break;
+      case "save-rem": if (editing) saveReminder(); break;
+      case "remove-rem":
+        if (!editing) break;
+        if (!editing.armed) { editing.armed = true; renderReminders(); }
+        else {
+          var rid2 = editing.id;
+          state.reminders = ownReminders().filter(function (r) { return r.id !== rid2; });
+          editing = null;
+          changed();
+        }
+        break;
+      case "rem-toggle":
+        ownReminders().forEach(function (r) { if (r.id === id) r.on = !r.on; });
+        changed();
+        break;
       case "copy-backup": copyBackup(); break;
       case "download-backup": downloadBackup(); break;
       case "restore-text": readBackup($("restoreText").value); break;
@@ -1447,7 +2046,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     if (!f) return;
     editing.draft[f] = t.value;
     if (editing.error) editing.error = "";
-    if (e.type === "change" && (f === "type" || f === "pillar")) render();
+    if (e.type === "change" && (f === "type" || f === "pillar" || f === "mode")) render();
   }
   document.addEventListener("input", function (e) {
     if (e.target && e.target.id === "taskInput") { taskDraft = e.target.value; return; }
@@ -1462,6 +2061,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       var v = parseFloat(raw);
       if (isFinite(v) && v >= 30 && v <= 250) setWeek(ws, "weight", Math.round(v * 10) / 10);
       else render();
+      return;
+    }
+    if (t && editing && editing.kind === "reminder" && (t.hasAttribute("data-remday") || t.hasAttribute("data-remhabit"))) {
+      var listKey = t.hasAttribute("data-remday") ? "days" : "picked";
+      var val = t.hasAttribute("data-remday") ? Number(t.getAttribute("data-remday")) : t.getAttribute("data-remhabit");
+      var arr = editing.draft[listKey].filter(function (x) { return x !== val; });
+      if (t.checked) arr.push(val);
+      editing.draft[listKey] = arr;
+      if (editing.error) editing.error = "";
+      return;
+    }
+    if (t && t.getAttribute && t.getAttribute("data-lockfield") === "target") {
+      lockPrefs.target = t.value;
+      saveLockPrefs();
+      renderLockPanel();
       return;
     }
     if (t && t.id === "restoreFile") {
@@ -1485,6 +2099,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         editing.draft[t.getAttribute("data-field")] = t.value;
         if (editing.kind === "habit") saveHabit();
         else if (editing.kind === "hours") saveHours();
+        else if (editing.kind === "reminder") saveReminder();
         else saveWeekly();
       } else if (e.key === "Escape") { e.preventDefault(); editing = null; render(); }
     }
@@ -1499,7 +2114,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     if (wasToday) selected = today;
     render();
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) checkToday(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { checkToday(); if (state.lock) tickLock(); } });
   window.addEventListener("focus", checkToday);
   setInterval(checkToday, 60000);
 
@@ -1528,6 +2143,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     dirty = true;
     state.v = 3;
     var stored = lsSet();
+    writeSnapshot();
     render();
     if (mode !== "db") {
       dirty = false;
@@ -1608,9 +2224,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     } else {
       useLocal();
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* optional */ }
+      writeSnapshot();
       if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-        navigator.serviceWorker.register("sw.js").catch(function () { /* offline support unavailable */ });
+        swRegistered = true;
+        navigator.serviceWorker.register("sw.js").catch(function () { swRegistered = false; renderReminders(); });
       }
+      initPush();
     }
   }
 

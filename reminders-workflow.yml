@@ -1,0 +1,137 @@
+# Sends your habit reminders to your phone.
+# Put this file in your repo at .github/workflows/reminders.yml
+# It needs one secret called REMINDER_SETUP (copy it from the Reminders section of the app).
+
+name: Habit reminders
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test notification now"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: habit-reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remember when it last ran
+        uses: actions/cache/restore@v4
+        with:
+          path: .reminder-state
+          key: reminder-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: reminder-state-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the push library
+        run: npm install --no-save --no-package-lock --silent web-push@3.6.7
+
+      - name: Send any reminders that are due
+        env:
+          REMINDER_SETUP: ${{ secrets.REMINDER_SETUP }}
+          TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.test }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          node <<'JS'
+          const fs = require("fs");
+          const webpush = require("web-push");
+          const STATE = ".reminder-state/last-run.txt";
+          const test = process.env.TEST === "true";
+          const stop = (msg) => { console.log(msg); process.exit(test ? 1 : 0); };
+
+          const raw = (process.env.REMINDER_SETUP || "").trim();
+          if (!raw) stop("No REMINDER_SETUP secret yet. Add it under Settings > Secrets and variables > Actions.");
+          let setup;
+          try { setup = JSON.parse(raw); } catch (e) { stop("REMINDER_SETUP isn't valid. In the app, tap Copy setup code again and paste all of it into the secret."); }
+          if (setup.app !== "habit-tracker-push" || !setup.sub || !setup.vapidPublic || !setup.vapidPrivate) {
+            stop("REMINDER_SETUP is missing parts. In the app, tap Copy setup code again and paste all of it into the secret.");
+          }
+          const owner = (process.env.OWNER || "").toLowerCase();
+          webpush.setVapidDetails(owner ? "https://" + owner + ".github.io/" : "https://github.com/", setup.vapidPublic, setup.vapidPrivate);
+
+          const tz = setup.tz || "Europe/London";
+          const fmt = new Intl.DateTimeFormat("en-GB", {
+            timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", weekday: "short", hourCycle: "h23"
+          });
+          const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          const local = (d) => {
+            const p = {};
+            for (const x of fmt.formatToParts(d)) p[x.type] = x.value;
+            return { date: p.year + "-" + p.month + "-" + p.day, time: p.hour + ":" + p.minute, wd: WD[p.weekday] };
+          };
+
+          // Work out which minutes have passed since the last run (at most the last hour).
+          const now = new Date();
+          now.setSeconds(0, 0);
+          let last = null;
+          try { last = new Date(fs.readFileSync(STATE, "utf8").trim()); } catch (e) { last = null; }
+          const from = (!last || isNaN(last)) ? new Date(now - 10 * 60e3) : new Date(Math.max(last.getTime(), now - 60 * 60e3));
+
+          const due = [];
+          for (let t = from.getTime() + 60e3; t <= now.getTime(); t += 60e3) {
+            const l = local(new Date(t));
+            for (const r of setup.times || []) {
+              if (r.t === l.time && (r.d || []).includes(l.wd)) due.push({ id: r.id, date: l.date, time: l.time });
+            }
+          }
+          if (test) { const l = local(now); due.push({ id: "test", date: l.date, time: l.time }); }
+
+          (async () => {
+            let failed = 0;
+            for (const m of due) {
+              try {
+                await webpush.sendNotification(setup.sub, JSON.stringify(m), { TTL: 3600, urgency: "high" });
+                console.log("Sent " + m.id + " for " + m.date + " " + m.time);
+              } catch (e) {
+                failed++;
+                if (e.statusCode === 404 || e.statusCode === 410) {
+                  console.log("Your phone has stopped accepting these notifications. Open the app, tap Turn on notifications, then copy the setup code into REMINDER_SETUP again.");
+                } else {
+                  console.log("Couldn't send " + m.id + ": " + (e.statusCode || "") + " " + (e.body || e.message));
+                }
+              }
+            }
+            if (!due.length) console.log("Nothing due between " + local(from).time + " and " + local(now).time + " (" + tz + ").");
+            fs.mkdirSync(".reminder-state", { recursive: true });
+            fs.writeFileSync(STATE, now.toISOString());
+            if (test && failed) process.exit(1);
+          })();
+          JS
+
+      - name: Save when it last ran
+        uses: actions/cache/save@v4
+        with:
+          path: .reminder-state
+          key: reminder-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # GitHub pauses schedules in repos with no changes for 60 days.
+      # This makes a tiny change about once every 45 days so the reminders keep going.
+      - name: Keep the schedule switched on
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          if [ $((now - last)) -gt $((45 * 24 * 3600)) ]; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > .github/keepalive.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive.txt
+            git commit -m "Keep the reminder schedule running"
+            git push
+          fi
